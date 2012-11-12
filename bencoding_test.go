@@ -1,4 +1,4 @@
-package bencoding
+package tracker
 
 import (
 	"reflect"
@@ -47,10 +47,10 @@ func Test_DecodeInt_1(t *testing.T) {
 
 func Test_DecodeList_1(t *testing.T) {
 	testdata := map[string][]bItem{
-		"l:3:cowe":      []bItem{bItem{s: "cow"}},
-		"l:3:cow3:hene": []bItem{bItem{s: "cow"}, bItem{s: "hen"}},
-		"l:3:cowi4ee":   []bItem{bItem{s: "cow"}, bItem{i: 4}},
-		"l:i5ei4ei3ee":  []bItem{bItem{i: 5}, bItem{i: 4}, bItem{i: 3}},
+		"l3:cowe":      []bItem{bItem{s: "cow"}},
+		"l3:cow3:hene": []bItem{bItem{s: "cow"}, bItem{s: "hen"}},
+		"l3:cowi4ee":   []bItem{bItem{s: "cow"}, bItem{i: 4}},
+		"li5ei4ei3ee":  []bItem{bItem{i: 5}, bItem{i: 4}, bItem{i: 3}},
 		// "l:3:cowi4el:i5eee": []bItem{bItem{s: "cow"}, bItem{i: 4},
 		// 	bItem{l: []bItem{bItem{i: 5}}}},
 	}
@@ -65,7 +65,7 @@ func Test_DecodeList_1(t *testing.T) {
 }
 
 func Test_DecodeDict_1(t *testing.T) {
-	s := "d:3:cowl:i4ei-1eee"
+	s := "d3:cowli4ei-1eee"
 	b, _ := Bdecode([]byte(s))
 	if b.d["cow"].l[0].i != 4 {
 		t.Error("Failed dict decoding")
@@ -73,5 +73,12 @@ func Test_DecodeDict_1(t *testing.T) {
 	if b.d["cow"].l[1].i != -1 {
 		t.Error("Failed dict decoding")
 	}
+}
 
+func Test_DecodeDict_2(t *testing.T) {
+	s := "d8:announce4:kanne"
+	b, _ := Bdecode([]byte(s))
+	if b.d["announce"].s != "kann" {
+		t.Error("Failed dict decoding")
+	}
 }

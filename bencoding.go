@@ -1,4 +1,4 @@
-package bencoding
+package tracker
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ func bdecodeString(p []byte) string {
 	return string(p)
 }
 
-func Bdecode(p []byte) (bItem, int) {
+func Bdecode(p []byte) (*bItem, int) {
 	bi := new(bItem)
 	progress := 0
 	end := 0
@@ -42,21 +42,21 @@ func Bdecode(p []byte) (bItem, int) {
 		progress = end + 1
 	case 'l':
 		bi.l = (make([]bItem, 0))
-		start := 2
+		start := 1
 		q := 0
-		var i bItem
+		var i *bItem
 		for {
 			i, q = Bdecode(p[start:])
 			if q == 1 {
 				break
 			}
-			bi.l = append(bi.l, i)
+			bi.l = append(bi.l, *i)
 			start += q
 		}
 		progress = start
 	case 'd':
 		bi.d = make(map[string]bItem)
-		start := 2
+		start := 1
 		for {
 			i, q := Bdecode(p[start:])
 			if q == 1 {
@@ -64,7 +64,7 @@ func Bdecode(p []byte) (bItem, int) {
 			}
 			start += q
 			j, r := Bdecode(p[start:])
-			bi.d[i.s] = j
+			bi.d[i.s] = *j
 			start += r
 		}
 		progress = start + 1
@@ -76,5 +76,6 @@ func Bdecode(p []byte) (bItem, int) {
 		bi.s = bdecodeString(p[end : end+int(length)])
 		progress = end + int(length)
 	}
-	return *bi, progress
+
+	return bi, progress
 }
