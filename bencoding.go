@@ -1,35 +1,27 @@
 package bencoding
+
 import (
-	"strconv"
 	"bytes"
+	"strconv"
 )
 
 type bItem struct {
 	s string
-	i int64
-	l *bList
-	d *bDict
-}
-
-type bList struct {
+	i int
 	l []bItem
-}
-
-type bDict struct {
 	d map[string]bItem
 }
-
 
 type bError struct {
 }
 
-func (e * bError) Error() string {
+func (e *bError) Error() string {
 	return "bError happened"
 }
 
-func bdecodeInt(p []byte) int64 {
+func bdecodeInt(p []byte) int {
 	i, _ := strconv.Atoi(string(p))
-	return int64(i)
+	return int(i)
 }
 
 func bdecodeString(p []byte) string {
@@ -45,26 +37,34 @@ func Bdecode(p []byte) (bItem, int) {
 	case 'e':
 		progress = 1
 	case 'i':
-		end = bytes.IndexByte(p[2:], 'e')
-		bi.i = bdecodeInt(p[2:end])
+		end = bytes.IndexByte(p[0:], 'e')
+		bi.i = bdecodeInt(p[1:end])
 		progress = end + 1
 	case 'l':
-		bi.l = new(bList)
-		bi.l.l = make([]bItem, 0)
+		bi.l = (make([]bItem, 0))
 		start := 2
-		for i, q := Bdecode(p[start:]); q > 1; {
-			bi.l.l = append(bi.l.l, i)
+		q := 0
+		var i bItem
+		for {
+			i, q = Bdecode(p[start:])
+			if q == 1 {
+				break
+			}
+			bi.l = append(bi.l, i)
 			start += q
 		}
-		progress = start + 1
+		progress = start
 	case 'd':
-		bi.d = new(bDict)
-		bi.d.d = make(map[string]bItem)
+		bi.d = make(map[string]bItem)
 		start := 2
-		for i, q := Bdecode(p[start:]); q > 1; {
+		for {
+			i, q := Bdecode(p[start:])
+			if q == 1 {
+				break
+			}
 			start += q
 			j, r := Bdecode(p[start:])
-			bi.d.d[i.s] = j
+			bi.d[i.s] = j
 			start += r
 		}
 		progress = start + 1
@@ -72,8 +72,8 @@ func Bdecode(p []byte) (bItem, int) {
 		// String
 		end = bytes.IndexByte(p[0:], ':')
 		length := bdecodeInt(p[0:end])
-		end ++
-		bi.s = bdecodeString(p[end:end+int(length)])
+		end++
+		bi.s = bdecodeString(p[end : end+int(length)])
 		progress = end + int(length)
 	}
 	return *bi, progress
