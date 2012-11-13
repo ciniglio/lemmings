@@ -1,9 +1,9 @@
 package tracker
 
 import (
+	"crypto/sha1"
 	"io"
 	"io/ioutil"
-	"crypto/sha1"
 )
 
 type torrentFile struct {
@@ -11,7 +11,7 @@ type torrentFile struct {
 	path   string //filename
 }
 
-type TrackerInfo struct {
+type TorrentInfo struct {
 	announce    string        // tracker url
 	name        string        // filename or dirname depending on length of files
 	pieceLength int64         // size of each piece
@@ -19,9 +19,10 @@ type TrackerInfo struct {
 	files       []torrentFile // info for each file
 	numfiles    int64         // not part of file, but helpful
 	info_hash   string        // sha1 of info dict
+	client_id   string        // randomly generated 20 bytes
 }
 
-func ReadTorrentFile(path string) *TrackerInfo {
+func ReadTorrentFile(path string) *TorrentInfo {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
@@ -29,20 +30,25 @@ func ReadTorrentFile(path string) *TrackerInfo {
 	return ParseTorrentInfo(b)
 }
 
-func (t *TrackerInfo) add_info_hash(info bItem){
+func (t *TorrentInfo) add_info_hash(info bItem) {
 	h := sha1.New()
 	io.WriteString(h, string(Bencode(info)))
 	t.info_hash = string(h.Sum(nil))
 }
 
-func ParseTorrentInfo(b []byte) *TrackerInfo {
+func (t *TorrentInfo) generate_client_id() {
+	t.client_id = string(RandomBytes(20))
+}
+
+func ParseTorrentInfo(b []byte) *TorrentInfo {
 	bi, _ := Bdecode(b)
-	t := new(TrackerInfo)
+	t := new(TorrentInfo)
 	t.announce = bi.d["announce"].s
 
 	info := bi.d["info"].d
 
 	t.add_info_hash(bi.d["info"])
+	t.generate_client_id()
 
 	t.name = info["name"].s
 	t.pieceLength = info["piece length"].i
