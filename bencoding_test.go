@@ -39,7 +39,7 @@ func Test_DecodeInt_1(t *testing.T) {
 
 	for k, v := range testdata {
 		s, _ := Bdecode([]byte(k))
-		if s.i != v {
+		if s.i != int64(v) {
 			t.Error("Int decoding failed:", v)
 		}
 	}

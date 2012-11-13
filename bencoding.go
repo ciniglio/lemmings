@@ -7,7 +7,7 @@ import (
 
 type bItem struct {
 	s string
-	i int
+	i int64
 	l []bItem
 	d map[string]bItem
 }
@@ -19,9 +19,9 @@ func (e *bError) Error() string {
 	return "bError happened"
 }
 
-func bdecodeInt(p []byte) int {
+func bdecodeInt(p []byte) int64 {
 	i, _ := strconv.Atoi(string(p))
-	return int(i)
+	return int64(i)
 }
 
 func bdecodeString(p []byte) string {
