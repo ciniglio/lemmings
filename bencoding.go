@@ -83,14 +83,14 @@ func Bdecode(p []byte) (*bItem, int) {
 func bencodeInt(i int64) []byte {
 	out := []byte{}
 	out = append(out, byte('i'))
-	out = append(out, []byte(strconv.Itoa(int(i)))...)
+	out = append(out, strconv.Itoa(int(i))...)
 	out = append(out, byte('e'))
 	return out
 }
 
 func bencodeString(s string) []byte {
 	out := []byte{}
-	out = append(out, []byte(strconv.Itoa(len(s)))...)
+	out = append(out, strconv.Itoa(len(s))...)
 	out = append(out, ':')
 	out = append(out, s...)
 	return out

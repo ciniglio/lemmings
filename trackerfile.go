@@ -1,7 +1,9 @@
 package tracker
 
 import (
+	"io"
 	"io/ioutil"
+	"crypto/sha1"
 )
 
 type torrentFile struct {
@@ -16,6 +18,7 @@ type TrackerInfo struct {
 	pieces      []string      // checksums for each piece
 	files       []torrentFile // info for each file
 	numfiles    int64         // not part of file, but helpful
+	info_hash   string        // sha1 of info dict
 }
 
 func ReadTorrentFile(path string) *TrackerInfo {
@@ -26,12 +29,21 @@ func ReadTorrentFile(path string) *TrackerInfo {
 	return ParseTorrentInfo(b)
 }
 
+func (t *TrackerInfo) add_info_hash(info bItem){
+	h := sha1.New()
+	io.WriteString(h, string(Bencode(info)))
+	t.info_hash = string(h.Sum(nil))
+}
+
 func ParseTorrentInfo(b []byte) *TrackerInfo {
 	bi, _ := Bdecode(b)
 	t := new(TrackerInfo)
 	t.announce = bi.d["announce"].s
 
 	info := bi.d["info"].d
+
+	t.add_info_hash(bi.d["info"])
+
 	t.name = info["name"].s
 	t.pieceLength = info["piece length"].i
 	for i := 0; i < len(info["pieces"].s); i += 20 {
