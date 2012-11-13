@@ -5,7 +5,7 @@ import (
 )
 
 type torrentFile struct {
-	length int64    //size of file in bytes
+	length int64  //size of file in bytes
 	path   string //filename
 }
 
@@ -15,7 +15,7 @@ type TrackerInfo struct {
 	pieceLength int64         // size of each piece
 	pieces      []string      // checksums for each piece
 	files       []torrentFile // info for each file
-	numfiles    int64           // not part of file, but helpful
+	numfiles    int64         // not part of file, but helpful
 }
 
 func ReadTorrentFile(path string) *TrackerInfo {

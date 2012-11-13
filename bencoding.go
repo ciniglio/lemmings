@@ -79,3 +79,43 @@ func Bdecode(p []byte) (*bItem, int) {
 
 	return bi, progress
 }
+
+func bencodeInt(i int64) []byte {
+	out := []byte{}
+	out = append(out, byte('i'))
+	out = append(out, []byte(strconv.Itoa(int(i)))...)
+	out = append(out, byte('e'))
+	return out
+}
+
+func bencodeString(s string) []byte {
+	out := []byte{}
+	out = append(out, []byte(strconv.Itoa(len(s)))...)
+	out = append(out, ':')
+	out = append(out, s...)
+	return out
+}
+
+func Bencode(b bItem) []byte {
+	out := []byte{}
+	switch {
+	case len(b.d) > 0:
+		out = append(out, byte('d'))
+		for k, v := range b.d {
+			out = append(out, bencodeString(k)...)
+			out = append(out, Bencode(v)...)
+		}
+		out = append(out, byte('e'))
+	case len(b.l) > 0:
+		out = append(out, byte('l'))
+		for _, i := range b.l {
+			out = append(out, Bencode(i)...)
+		}
+		out = append(out, byte('e'))
+	case len(b.s) > 0:
+		out = append(out, bencodeString(b.s)...)
+	default:
+		out = append(out, bencodeInt(b.i)...)
+	}
+	return out
+}
