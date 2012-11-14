@@ -11,20 +11,21 @@ import (
 )
 
 type TrackerGetRequest struct {
-	info_hash    string
-	peer_id      string
-	port         string
-	ip_addr      string //optional
-	uploaded     int
-	downloaded   int
-	left         int
-	compact      int    // 0 or 1
-	no_peer_id   int    // 0 or 1, optional
-	event        string // started, stopped or completed (can be blank)
-	numwant      int    // optional
-	key          string // optional
-	tracker_id   string // optional
-	torrent_info *TorrentInfo
+	info_hash        string
+	peer_id          string
+	port             string
+	ip_addr          string //optional
+	uploaded         int
+	downloaded       int
+	left             int
+	compact          int    // 0 or 1
+	no_peer_id       int    // 0 or 1, optional
+	event            string // started, stopped or completed (can be blank)
+	numwant          int    // optional
+	key              string // optional
+	tracker_id       string // optional
+	torrent_info     *TorrentInfo
+	tracker_response *TrackerResponse
 }
 
 type torrentPeer struct {
@@ -43,7 +44,7 @@ type TrackerResponse struct {
 	peers          []torrentPeer
 }
 
-func CreateTrackerGetRequest(t *TorrentInfo) *TrackerGetRequest {
+func CreateTrackerProxy(t *TorrentInfo) *TrackerGetRequest {
 	tgr := new(TrackerGetRequest)
 	tgr.info_hash = t.info_hash
 	tgr.peer_id = t.client_id
@@ -72,7 +73,12 @@ func (t *TrackerGetRequest) MakeTrackerRequest() {
 		log.Fatal(err)
 	}
 	tr := parseTrackerResponse(string(robots))
-	tr.complete = tr.complete
+	t.tracker_response = tr
+}
+
+func (t *TrackerGetRequest) GetPeers() []torrentPeer {
+	t.MakeTrackerRequest()
+	return t.tracker_response.peers
 }
 
 func parsePeersDictionary(m []bItem) []torrentPeer {
@@ -102,8 +108,9 @@ func parsePeersString(s string) []torrentPeer {
 		// get Port
 		var n uint16
 		tmp = make([]byte, 2)
-		for j := 0; j < 2; j++ {
-			tmp[j] = byte(s[i+j])
+		for j := 4; j < 6; j++ {
+			tmp[j-4] = byte(s[i+j])
+			
 		}
 		buf := bytes.NewBuffer(tmp)
 		binary.Read(buf, binary.BigEndian, &n)
