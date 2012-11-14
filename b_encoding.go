@@ -33,7 +33,7 @@ func Bdecode(p []byte) (*bItem, int) {
 	bi := new(bItem)
 	progress := 0
 	end := 0
-	bi.raw = p[:]
+
 	switch p[0] {
 	case 'e':
 		progress = 1
@@ -77,7 +77,7 @@ func Bdecode(p []byte) (*bItem, int) {
 		bi.s = bdecodeString(p[end : end+int(length)])
 		progress = end + int(length)
 	}
-
+	bi.raw = p[0:progress]
 	return bi, progress
 }
 
