@@ -6,10 +6,11 @@ import (
 )
 
 type bItem struct {
-	s string
-	i int64
-	l []bItem
-	d map[string]bItem
+	s   string
+	i   int64
+	l   []bItem
+	d   map[string]bItem
+	raw []byte
 }
 
 type bError struct {
@@ -32,7 +33,7 @@ func Bdecode(p []byte) (*bItem, int) {
 	bi := new(bItem)
 	progress := 0
 	end := 0
-
+	bi.raw = p[:]
 	switch p[0] {
 	case 'e':
 		progress = 1
