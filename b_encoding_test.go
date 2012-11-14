@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -57,7 +56,10 @@ func Test_DecodeList_1(t *testing.T) {
 	for k, v := range testdata {
 		s, _ := Bdecode([]byte(k))
 		for j, u := range s.l {
-			if !(reflect.DeepEqual(u, v[j])) {
+			if !(u.s == v[j].s) {
+				t.Error("Failed List")
+			}
+			if !(u.i == v[j].i) {
 				t.Error("Failed List")
 			}
 		}
