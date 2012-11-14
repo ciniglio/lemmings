@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"crypto/sha1"
-	"io"
 	"io/ioutil"
 )
 
@@ -32,7 +31,7 @@ func ReadTorrentFile(path string) *TorrentInfo {
 
 func (t *TorrentInfo) add_info_hash(info bItem) {
 	h := sha1.New()
-	io.WriteString(h, string(Bencode(info)))
+	h.Write(info.raw)
 	t.info_hash = string(h.Sum(nil))
 }
 
