@@ -17,11 +17,20 @@ func RandomBytes(n int) []byte {
 	return out
 }
 
-func toInt(b []byte) int {
-	var i int
+func toInt64(b []byte) int64 {
+	var i int64
+	if len(b) < 8 {
+		tmp := make([]byte, 8 - len(b))
+		tmp = append(tmp, b...)
+		b = tmp
+	}
 	err := binary.Read(bytes.NewReader(b), binary.BigEndian, &i)
 	if err != nil {
 		fmt.Println("Error converting to int: ", err)
 	}
 	return i
+}
+
+func toInt(b []byte) int {
+	return int(toInt64(b))
 }
