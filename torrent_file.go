@@ -13,7 +13,7 @@ type torrentFile struct {
 type TorrentInfo struct {
 	announce    string        // tracker url
 	name        string        // filename or dirname depending on length of files
-	pieceLength int64         // size of each piece
+	pieceLength int64         // size of each piece //TODO
 	pieces      []string      // checksums for each piece
 	files       []torrentFile // info for each file
 	numfiles    int64         // not part of file, but helpful

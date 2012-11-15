@@ -65,7 +65,7 @@ func (peer *Peer) runPeer() {
 	var data []byte
 	for {
 		n := peer.readRawBytesFromConnection(&data)
-		fmt.Printf("OUTER Data has %d bytes: % X\n", len(data), data)
+		fmt.Printf("OUTER Data has %d bytes: %s\n", len(data), data)
 		if len(data) > 0 {
 			fmt.Printf("Receieved %d bytes: % X\n", n, data)
 			if msg, _ := peer.parseHandshakeMessage(&data); msg == nil {
@@ -89,9 +89,18 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 		curpos += 2 + toInt(m[:2])
 		fmt.Printf("Choke/Unchoke/Interested/Uninterested")
 		peer.recieveChokeAndInterest(m[2:curpos])
+	case bytes.Compare(m[:2], []byte("\x00\x05")) == 0 &&
+			bytes.Compare(m[2:3], []byte("\x04")) == 0:
+		curpos += 2 + toInt(m[:2])
+		fmt.Printf("Recieved HAVE")
+		peer.recieveHasMessage(m[3:curpos])
 	}
 	*b = m[curpos:]
 	return
+}
+
+func (peer *Peer) recieveHasMessage(b []byte) {
+	
 }
 
 func (peer *Peer) recieveChokeAndInterest(b []byte) {
@@ -108,22 +117,33 @@ func (peer *Peer) recieveChokeAndInterest(b []byte) {
 	}
 }
 
-func (p *Peer) readRawBytesFromConnection(out *[]byte) (int) {
-	readcount := 0
+func (p *Peer) readerRoutine(c chan []byte){
+
 	bufsize := 1024
-	//out := make([]byte, 0)
 	for {
+		var tmp []byte
 		data := make([]byte, bufsize)
 		n, err := p.connection.Read(data) 
 		if err != io.EOF && err != nil {
 			fmt.Printf("Read %d bytes\n", n)
 			fmt.Println("Reading from connection: ", err)
 		}
+		tmp = append(tmp, data[0:n]...)
+		c <- tmp
+	}
+}
+
+func (p *Peer) readRawBytesFromConnection(out *[]byte) (int) {
+	readcount := 0
+	var c chan []byte
+	go p.readerRoutine(c)
+	select {
+	case data := <-c :
+		n := len(data)
 		readcount += n
 		*out = append(*out, data[0:n]...)
-		if n < bufsize {
-			break
-		}
+	default :
+		return 0
 	}
 	return readcount
 }

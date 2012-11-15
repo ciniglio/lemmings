@@ -9,5 +9,4 @@ func main() {
 	for _, p := range peers_info {
 		CreatePeer(&p, torrent)
 	}
-
 }

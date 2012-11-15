@@ -29,7 +29,7 @@ type TrackerGetRequest struct {
 }
 
 type torrentPeer struct {
-	peer_id string
+	peer_id string //optional initially
 	ip      string
 	port    int
 }
@@ -63,6 +63,7 @@ func (t *TrackerGetRequest) GenerateGetString() string {
 
 func (t *TrackerGetRequest) MakeTrackerRequest() {
 	q := t.GenerateGetString()
+	fmt.Printf("Tracker Announce: %V\n\n", q)
 	res, err := http.Get(q)
 	if err != nil {
 		log.Fatal(err)
@@ -74,6 +75,7 @@ func (t *TrackerGetRequest) MakeTrackerRequest() {
 	}
 	tr := parseTrackerResponse(string(robots))
 	t.tracker_response = tr
+	fmt.Printf("Tracker Response: %s\n\n", string(robots))
 }
 
 func (t *TrackerGetRequest) GetPeers() []torrentPeer {
