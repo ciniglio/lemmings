@@ -20,6 +20,7 @@ type TorrentInfo struct {
 	numfiles    int64         // not part of file, but helpful
 	info_hash   string        // sha1 of info dict
 	client_id   string        // randomly generated 20 bytes
+	our_pieces  *Pieces
 }
 
 func ReadTorrentFile(path string) *TorrentInfo {
@@ -57,6 +58,7 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 	}
 
 	t.numpieces = len(t.pieces)
+	t.our_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
 
 	if info["length"].i > 0 {
 		f := new(torrentFile)

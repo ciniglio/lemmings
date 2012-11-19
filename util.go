@@ -17,6 +17,11 @@ func RandomBytes(n int) []byte {
 	return out
 }
 
+func RandomInt(n int) int {
+	rand.Seed(time.Now().UTC().UnixNano())
+	return rand.Intn(n)
+}
+
 func toInt64(b []byte) int64 {
 	var i int64
 	if len(b) < 8 {

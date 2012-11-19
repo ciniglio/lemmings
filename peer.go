@@ -33,7 +33,6 @@ type Peer struct {
 	their_id        [20]byte
 	shook_hands     bool
 	receiving_chan  chan []byte
-	our_pieces      *Pieces
 	their_pieces    *Pieces
 }
 
@@ -63,7 +62,7 @@ func (peer *Peer) connect() bool {
 	} else {
 		fmt.Println("Connected to a peer")
 	}
-	go peer.readerRoutine()
+
 	return true
 }
 
@@ -79,14 +78,14 @@ func CreatePeer(p *torrentPeer, t *TorrentInfo) *Peer {
 	peer.connection_info = InitialConnectionInfo()
 	peer.receiving_chan = make(chan []byte)
 
-	peer.our_pieces = CreateNewPieces(t.numpieces)
-	peer.their_pieces = CreateNewPieces(t.numpieces)
+	peer.their_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
 
 	peer.runPeer()
 	return peer
 }
 
 func (peer *Peer) runPeer() {
+	go peer.readerRoutine()
 	peer.initiateHandshake()
 	fmt.Println("Sent Handshake")
 	var data []byte
@@ -192,8 +191,10 @@ func (p *Peer) readerRoutine() {
 			fmt.Printf("Read %d bytes\n", n)
 			fmt.Println("Reading from connection: ", err)
 		}
-		tmp = append(tmp, data[0:n]...)
-		p.receiving_chan <- tmp
+		if n > 0 {
+			tmp = append(tmp, data[0:n]...)
+			p.receiving_chan <- tmp
+		}
 	}
 }
 
