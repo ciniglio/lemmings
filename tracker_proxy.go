@@ -63,7 +63,7 @@ func (t *TrackerGetRequest) GenerateGetString() string {
 
 func (t *TrackerGetRequest) MakeTrackerRequest() {
 	q := t.GenerateGetString()
-	fmt.Printf("Tracker Announce: %V\n\n", q)
+	fmt.Printf("Tracker Announce: %v\n\n", q)
 	res, err := http.Get(q)
 	if err != nil {
 		log.Fatal(err)
@@ -112,7 +112,7 @@ func parsePeersString(s string) []torrentPeer {
 		tmp = make([]byte, 2)
 		for j := 4; j < 6; j++ {
 			tmp[j-4] = byte(s[i+j])
-			
+
 		}
 		buf := bytes.NewBuffer(tmp)
 		binary.Read(buf, binary.BigEndian, &n)

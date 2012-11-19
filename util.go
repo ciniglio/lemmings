@@ -1,11 +1,11 @@
 package tracker
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"time"
-	"encoding/binary"
-	"bytes"
-	"fmt"
 )
 
 func RandomBytes(n int) []byte {
@@ -20,7 +20,7 @@ func RandomBytes(n int) []byte {
 func toInt64(b []byte) int64 {
 	var i int64
 	if len(b) < 8 {
-		tmp := make([]byte, 8 - len(b))
+		tmp := make([]byte, 8-len(b))
 		tmp = append(tmp, b...)
 		b = tmp
 	}
