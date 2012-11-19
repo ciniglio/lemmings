@@ -11,10 +11,11 @@ type torrentFile struct {
 }
 
 type TorrentInfo struct {
-	announce    string        // tracker url
-	name        string        // filename or dirname depending on length of files
-	pieceLength int64         // size of each piece //TODO
-	pieces      []string      // checksums for each piece
+	announce    string   // tracker url
+	name        string   // filename or dirname depending on length of files
+	pieceLength int64    // size of each piece in bytes
+	pieces      []string // checksums for each piece
+	numpieces   int
 	files       []torrentFile // info for each file
 	numfiles    int64         // not part of file, but helpful
 	info_hash   string        // sha1 of info dict
@@ -54,6 +55,8 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 	for i := 0; i < len(info["pieces"].s); i += 20 {
 		t.pieces = append(t.pieces, info["pieces"].s[i:i+20])
 	}
+
+	t.numpieces = len(t.pieces)
 
 	if info["length"].i > 0 {
 		f := new(torrentFile)

@@ -13,6 +13,7 @@ type Pieces struct {
 	blocks *[]Blocks
 }
 
-func CreateNewPieces(num_pieces int64) []Pieces {
-	return make([]Pieces, num_pieces)
+func CreateNewPieces(num_pieces int) *[]Pieces {
+	p := make([]Pieces, num_pieces)
+	return &p
 }

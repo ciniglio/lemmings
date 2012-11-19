@@ -33,6 +33,8 @@ type Peer struct {
 	their_id        [20]byte
 	shook_hands     bool
 	receiving_chan  chan []byte
+	our_pieces      *[]Pieces
+	their_pieces    *[]Pieces
 }
 
 func InitialConnectionInfo() *PeerConnectionInfo {
@@ -42,7 +44,7 @@ func InitialConnectionInfo() *PeerConnectionInfo {
 	return ci
 }
 
-func (peer *Peer) connect() bool{
+func (peer *Peer) connect() bool {
 	p := peer.torrent_peer
 	dest_addr := new(net.TCPAddr)
 	dest_addr.IP = net.ParseIP(p.ip)
@@ -61,6 +63,7 @@ func (peer *Peer) connect() bool{
 	} else {
 		fmt.Println("Connected to a peer")
 	}
+	go peer.readerRoutine()
 	return true
 }
 
@@ -75,6 +78,10 @@ func CreatePeer(p *torrentPeer, t *TorrentInfo) *Peer {
 	}
 	peer.connection_info = InitialConnectionInfo()
 	peer.receiving_chan = make(chan []byte)
+
+	peer.our_pieces = CreateNewPieces(t.numpieces)
+	peer.their_pieces = CreateNewPieces(t.numpieces)
+
 	peer.runPeer()
 	return peer
 }
@@ -101,7 +108,6 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 	curpos := 0
 	switch {
 	case bytes.Compare(m[:2], []byte("\x00\x00")) == 0:
-		// Keep alive, do nothing
 		curpos += 2
 		fmt.Printf("Keep Alive\n")
 	case bytes.Compare(m[:2], []byte("\x00\x01")) == 0:
@@ -112,13 +118,31 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 		bytes.Compare(m[2:3], []byte("\x04")) == 0:
 		curpos += 2 + toInt(m[:2])
 		fmt.Printf("Recieved HAVE")
-		peer.recieveHasMessage(m[3:curpos])
+		peer.recieveHaveMessage(m[3:curpos])
+	case bytes.Compare(m[2:3], []byte("\x05")) == 0:
+		curpos += 2 + toInt(m[:2])
+		fmt.Printf("Recieved BitField")
+		peer.recieveBitField(m[3:curpos])
 	}
 	*b = m[curpos:]
 	return
 }
 
-func (peer *Peer) recieveHasMessage(b []byte) {
+func (peer *Peer) recieveBitField(b []byte) {
+	ind := 0
+	for _, by := range b {
+		for j := 7; j >= 0; j-- {
+			have := ((by>>uint(j))&1 == 1)
+			(*peer.their_pieces)[ind].have = have
+			ind++
+			if ind >= peer.torrent_info.numpieces {
+				return
+			}
+		}
+	}
+}
+
+func (peer *Peer) recieveHaveMessage(b []byte) {
 
 }
 
@@ -137,24 +161,25 @@ func (peer *Peer) recieveChokeAndInterest(b []byte) {
 }
 
 func (p *Peer) readerRoutine() {
-	bufsize := 1024
-	var tmp []byte
-	data := make([]byte, bufsize)
-	n, err := p.connection.Read(data)
+	for {
+		bufsize := 1024
+		var tmp []byte
+		data := make([]byte, bufsize)
+		n, err := p.connection.Read(data)
 
-	if err != io.EOF && err != nil {
-		fmt.Printf("Read %d bytes\n", n)
-		fmt.Println("Reading from connection: ", err)
+		if err != io.EOF && err != nil {
+			fmt.Printf("Read %d bytes\n", n)
+			fmt.Println("Reading from connection: ", err)
+		}
+		tmp = append(tmp, data[0:n]...)
+		p.receiving_chan <- tmp
 	}
-	tmp = append(tmp, data[0:n]...)
-	p.receiving_chan <- tmp
-
 }
 
 func (p *Peer) readRawBytesFromConnection(out *[]byte) int {
 	readcount := 0
 	c := p.receiving_chan
-	go p.readerRoutine()
+
 	select {
 	case data := <-c:
 		fmt.Println("Recieving data")
