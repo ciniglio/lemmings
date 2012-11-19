@@ -143,7 +143,8 @@ func (peer *Peer) recieveBitField(b []byte) {
 }
 
 func (peer *Peer) recieveHaveMessage(b []byte) {
-
+	i := toInt(b)
+	(*peer.their_pieces)[i].have = true
 }
 
 func (peer *Peer) recieveChokeAndInterest(b []byte) {
