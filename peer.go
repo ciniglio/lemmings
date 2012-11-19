@@ -33,8 +33,8 @@ type Peer struct {
 	their_id        [20]byte
 	shook_hands     bool
 	receiving_chan  chan []byte
-	our_pieces      *[]Pieces
-	their_pieces    *[]Pieces
+	our_pieces      *Pieces
+	their_pieces    *Pieces
 }
 
 func InitialConnectionInfo() *PeerConnectionInfo {
@@ -153,7 +153,7 @@ func (peer *Peer) recieveBitField(b []byte) {
 	for _, by := range b {
 		for j := 7; j >= 0; j-- {
 			have := ((by>>uint(j))&1 == 1)
-			(*peer.their_pieces)[ind].have = have
+			peer.their_pieces.setAtIndex(ind, have)
 			ind++
 			if ind >= peer.torrent_info.numpieces {
 				return
@@ -164,7 +164,7 @@ func (peer *Peer) recieveBitField(b []byte) {
 
 func (peer *Peer) recieveHaveMessage(b []byte) {
 	i := toInt(b)
-	(*peer.their_pieces)[i].have = true
+	peer.their_pieces.setAtIndex(i, true)
 }
 
 func (peer *Peer) recieveChokeAndInterest(b []byte) {

@@ -4,16 +4,33 @@ import (
 //	"fmt"
 )
 
-type Blocks struct {
+type blocks struct {
 	blocks []bool
 }
 
-type Pieces struct {
+type piece struct {
 	have   bool
-	blocks *[]Blocks
+	blocks *[]blocks
 }
 
-func CreateNewPieces(num_pieces int) *[]Pieces {
-	p := make([]Pieces, num_pieces)
-	return &p
+type Pieces struct {
+	pieces []piece
+}
+
+func (p *Pieces) length() int {
+	return len(p.pieces)
+}
+
+func (p *Pieces) haveAtIndex(i int) bool {
+	return p.pieces[i].have
+}
+
+func (p *Pieces) setAtIndex(i int, b bool) {
+	p.pieces[i].have = b
+}
+
+func CreateNewPieces(num_pieces int) *Pieces {
+	pieces := new(Pieces)
+	pieces.pieces = make([]piece, num_pieces)
+	return pieces
 }
