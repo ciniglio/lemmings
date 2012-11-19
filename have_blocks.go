@@ -8,6 +8,7 @@ type piece struct {
 	have      bool
 	requested bool
 	blocks    []bool
+	blocks_requested []bool
 	data      []byte
 }
 
@@ -31,6 +32,7 @@ func (p *Pieces) setAtIndex(i int, b bool) {
 func (p *Pieces) initBlocksAtPiece(i int) {
 	size := p.piece_length / 16384
 	p.pieces[i].blocks = make([]bool, size)
+	p.pieces[i].blocks_requested = make([]bool, size)
 	p.pieces[i].data = make([]byte, p.piece_length)
 }
 
@@ -38,12 +40,20 @@ func (p *Pieces) lengthBlocksInPiece(i int) int {
 	return len(p.pieces[i].blocks)
 }
 
+func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
+	p.pieces[piece].requested = true
+	if p.pieces[piece].blocks == nil {
+		p.initBlocksAtPiece(piece)
+	}
+	p.pieces[piece].blocks_requested[offset] = true
+}
+
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int){
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
 		if !p.have && p.requested && theirs.pieces[i].have {
 			for j, b := range p.blocks {
-				if !b {
+				if !b && !p.blocks_requested[j] {
 					return i, j
 				}
 			}
@@ -59,13 +69,18 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int){
 	if ours.pieces[ind].blocks == nil {
 		ours.initBlocksAtPiece(ind)
 	}
+	indices = make([]int, 0)
 	for i, b := range ours.pieces[ind].blocks {
 		if !b {
-			ours.pieces[ind].requested = true
-			return ind, i
+			indices = append(indices, i)
 		}
 	}
-	return -1, -1
+	if len(indices) <= 0 {
+		return -1, -1
+	}
+
+	off := indices[RandomInt(len(indices))]
+	return ind, off
 }
 
 func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
