@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"io"
+	"runtime"
 )
 
 type PeerConnectionInfo struct {
@@ -31,6 +32,7 @@ type Peer struct {
 	connection_info *PeerConnectionInfo
 	their_id     [20]byte
 	shook_hands  bool
+	receiving_chan  chan []byte
 }
 
 func CreatePeer(p *torrentPeer, t *TorrentInfo) *Peer {
@@ -55,6 +57,8 @@ func CreatePeer(p *torrentPeer, t *TorrentInfo) *Peer {
 	} else {
 		fmt.Println("Connected to a peer")
 	}
+	peer.connection_info = new(PeerConnectionInfo)
+	peer.receiving_chan = make(chan []byte)
 	peer.runPeer()
 	return peer
 }
@@ -64,10 +68,9 @@ func (peer *Peer) runPeer() {
 	fmt.Println("Sent Handshake")
 	var data []byte
 	for {
-		n := peer.readRawBytesFromConnection(&data)
-		fmt.Printf("OUTER Data has %d bytes: %s\n", len(data), data)
+		runtime.Gosched()
+		peer.readRawBytesFromConnection(&data)
 		if len(data) > 0 {
-			fmt.Printf("Receieved %d bytes: % X\n", n, data)
 			if msg, _ := peer.parseHandshakeMessage(&data); msg == nil {
 				fmt.Printf("Data has %d bytes: % X\n", len(data), data)
 				peer.parseProtocolMessage(&data)
@@ -117,28 +120,28 @@ func (peer *Peer) recieveChokeAndInterest(b []byte) {
 	}
 }
 
-func (p *Peer) readerRoutine(c chan []byte){
-
+func (p *Peer) readerRoutine(){
 	bufsize := 1024
-	for {
-		var tmp []byte
-		data := make([]byte, bufsize)
-		n, err := p.connection.Read(data) 
-		if err != io.EOF && err != nil {
-			fmt.Printf("Read %d bytes\n", n)
-			fmt.Println("Reading from connection: ", err)
-		}
-		tmp = append(tmp, data[0:n]...)
-		c <- tmp
+	var tmp []byte
+	data := make([]byte, bufsize)
+	n, err := p.connection.Read(data) 
+
+	if err != io.EOF && err != nil {
+		fmt.Printf("Read %d bytes\n", n)
+		fmt.Println("Reading from connection: ", err)
 	}
+	tmp = append(tmp, data[0:n]...)
+	p.receiving_chan <- tmp
+
 }
 
 func (p *Peer) readRawBytesFromConnection(out *[]byte) (int) {
 	readcount := 0
-	var c chan []byte
-	go p.readerRoutine(c)
+	c := p.receiving_chan
+	go p.readerRoutine()
 	select {
 	case data := <-c :
+		fmt.Println("Recieving data")
 		n := len(data)
 		readcount += n
 		*out = append(*out, data[0:n]...)
