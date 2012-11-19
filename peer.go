@@ -106,26 +106,46 @@ func (peer *Peer) runPeer() {
 func (peer *Peer) parseProtocolMessage(b *[]byte) {
 	m := *b
 	curpos := 0
+
+	size := 2 + toInt(m[:2])
+	if size > len(m) {
+		// need to wait for more data
+		fmt.Printf("Message split across packets")
+		return
+	}
+	curpos += size
 	switch {
 	case bytes.Compare(m[:2], []byte("\x00\x00")) == 0:
-		curpos += 2
 		fmt.Printf("Keep Alive\n")
 	case bytes.Compare(m[:2], []byte("\x00\x01")) == 0:
-		curpos += 2 + toInt(m[:2])
-		fmt.Printf("Choke/Unchoke/Interested/Uninterested")
+		fmt.Println("Choke/Unchoke/Interested/Uninterested")
 		peer.recieveChokeAndInterest(m[2:curpos])
 	case bytes.Compare(m[:2], []byte("\x00\x05")) == 0 &&
 		bytes.Compare(m[2:3], []byte("\x04")) == 0:
-		curpos += 2 + toInt(m[:2])
-		fmt.Printf("Recieved HAVE")
+		fmt.Println("Recieved HAVE")
 		peer.recieveHaveMessage(m[3:curpos])
 	case bytes.Compare(m[2:3], []byte("\x05")) == 0:
-		curpos += 2 + toInt(m[:2])
-		fmt.Printf("Recieved BitField")
+		fmt.Println("Recieved BitField")
 		peer.recieveBitField(m[3:curpos])
+	case bytes.Compare(m[2:3], []byte("\x06")) == 0:
+		fmt.Println("Recieved request")
+		peer.recieveRequest(m[3:curpos])
+	case bytes.Compare(m[2:3], []byte("\x07")) == 0:
+		fmt.Println("Recieved Piece")
+		//peer.recievePiece(m[3:curpos])
+	case bytes.Compare(m[2:3], []byte("\x08")) == 0:
+		fmt.Println("Recieved Cancel")
+		//peer.recieveCancel(m[3:curpos])
+	case bytes.Compare(m[2:3], []byte("\x09")) == 0:
+		fmt.Println("Recieved Port")
+	default:
+		fmt.Println("Recieved unknown")
 	}
 	*b = m[curpos:]
 	return
+}
+
+func (peer *Peer) recieveRequest(b []byte) {
 }
 
 func (peer *Peer) recieveBitField(b []byte) {
