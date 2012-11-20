@@ -17,6 +17,7 @@ type Pieces struct {
 	piece_length int
 }
 
+
 func (p *Pieces) Length() int {
 	return len(p.pieces)
 }
@@ -48,6 +49,13 @@ func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
 	p.pieces[piece].blocks_requested[offset] = true
 }
 
+func (p *Pieces) String() string {
+	s := []byte("")
+	for _, v := range p.pieces {
+		s = append(s, []byte(fmt.Sprintf("<%v>", v.have))...)
+	}
+	return string(s)
+}
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int){
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
@@ -90,8 +98,11 @@ func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
 	return p.pieces[i].blocks[offset]
 }
 
-func (p *Pieces) SetBlockAtPieceAndOffest(i int, offset int, b []byte) {
+func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 	if i >= p.Length() || offset >= p.lengthBlocksInPiece(i) {
+		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
+		fmt.Printf("Compare to index: %d\n", p.Length())
+		
 		return
 	}
 	if len(b) < 16384 && i < (p.Length()-1) {
@@ -109,6 +120,8 @@ func (p *Pieces) checkPiece(i int) {
 	for _, b := range p.pieces[i].blocks {
 		if !b { return }
 	}
+	fmt.Println("Finished a block ", i)
+	fmt.Println(p)
 	p.pieces[i].have = true
 }
 

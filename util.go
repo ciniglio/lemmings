@@ -22,6 +22,12 @@ func RandomInt(n int) int {
 	return rand.Intn(n)
 }
 
+func to4Bytes(i uint32) []byte {
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, i)
+	return b
+}
+
 func toInt64(b []byte) int64 {
 	var i int64
 	if len(b) < 8 {

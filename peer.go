@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+var block_size uint32 = 16384
+
 type PeerConnectionInfo struct {
 	peer_choking    bool
 	peer_interested bool
@@ -94,12 +96,17 @@ func (peer *Peer) runPeer() {
 		runtime.Gosched()
 		peer.readRawBytesFromConnection(&data)
 		if len(data) > 0 {
+			// recv
 			if msg, _ := peer.parseHandshakeMessage(&data); msg == nil {
 				peer.parseProtocolMessage(&data)
 //				fmt.Printf("Data has %d bytes: % X\n", len(data), data)
 			}
 		} else {
-			
+			// send
+			piece, offset := peer.torrent_info.our_pieces.GetPieceAndOffsetForRequest(peer.their_pieces)
+			if piece >= 0 && offset >= 0 {
+				peer.attemptRequest(piece, offset)
+			}
 		}
 	}
 }
@@ -107,6 +114,22 @@ func (peer *Peer) runPeer() {
 func (p *Peer) attemptRequest(piece, offset int) {
 	if p.connection_info.peer_choking {
 		p.attemptInterested()
+	} else {
+		p.sendRequest(piece, offset)
+	}
+}
+
+func (p *Peer) sendRequest(piece, offset int) {
+	b := []byte("\x00\x00\x00\x0D")
+	b = append(b, byte(6))
+	b = append(b, to4Bytes(uint32(piece))...)
+	b = append(b, to4Bytes(uint32(offset))...)
+	b = append(b, to4Bytes(block_size)...)
+	n, err := p.connection.Write(b)
+	if err != nil {
+		fmt.Println("Send error", err)
+	} else {
+		fmt.Printf("Sent request: %d bytes\n", n)
 	}
 }
 
@@ -152,7 +175,7 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 	size := 4 + toInt(m[:4])
 	if size > len(m) {
 		// need to wait for more data
-		fmt.Printf("Message split across packets")
+		//fmt.Printf("Message split across packets")
 		return
 	}
 	curpos += size
@@ -165,20 +188,16 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 	case bytes.Compare(m[:4], []byte("\x00\x00\x00\x05")) == 0 &&
 		bytes.Compare(m[4:5], []byte("\x04")) == 0:
 		fmt.Println("Recieved HAVE")
-		peer.recieveHaveMessage(m[3:curpos])
+		peer.recieveHaveMessage(m[5:curpos])
 	case bytes.Compare(m[4:5], []byte("\x05")) == 0:
 		fmt.Println("Recieved BitField")
-		peer.recieveBitField(m[3:curpos])
-		piece, offset := peer.torrent_info.our_pieces.GetPieceAndOffsetForRequest(peer.their_pieces)
-		if piece >= 0 && offset >= 0 {
-			peer.attemptRequest(piece, offset)
-		}
+		peer.recieveBitField(m[5:curpos])
 	case bytes.Compare(m[4:5], []byte("\x06")) == 0:
 		fmt.Println("Recieved request")
-		peer.recieveRequest(m[3:curpos])
+		peer.recieveRequest(m[5:curpos])
 	case bytes.Compare(m[4:5], []byte("\x07")) == 0:
 		fmt.Println("Recieved Piece")
-		//peer.recievePiece(m[3:curpos])
+		peer.recievePiece(m[5:curpos])
 	case bytes.Compare(m[4:5], []byte("\x08")) == 0:
 		fmt.Println("Recieved Cancel")
 		//peer.recieveCancel(m[3:curpos])
@@ -187,8 +206,21 @@ func (peer *Peer) parseProtocolMessage(b *[]byte) {
 	default:
 		fmt.Println("Recieved unknown")
 	}
-	*b = m[curpos:]
+	if curpos != len(m) {
+		*b = m[curpos:]
+	} else {
+		*b = nil
+	}
+		
 	return
+}
+
+func (p *Peer) recievePiece(b []byte) {
+	//fmt.Printf("Piece: %X", b)
+	fmt.Printf("Piece: %X\n", b[:10])
+	piece := toInt(b[:4])
+	offset := toInt(b[4:8])
+	p.torrent_info.our_pieces.SetBlockAtPieceAndOffset(piece, offset, b[8:])
 }
 
 func (peer *Peer) recieveRequest(b []byte) {
@@ -256,7 +288,7 @@ func (p *Peer) readRawBytesFromConnection(out *[]byte) int {
 
 	select {
 	case data := <-c:
-		fmt.Println("Recieving data")
+		//fmt.Println("Recieving data")
 		n := len(data)
 		readcount += n
 		*out = append(*out, data[0:n]...)

@@ -18,7 +18,7 @@ func Test_CreatingStructure_1(test *testing.T) {
 	if c.HaveBlockAtPieceAndOffset(0, 0) != false {
 		test.Error("Failed block init", c)
 	}
-	c.SetBlockAtPieceAndOffest(0, 0, make([]byte, 16384))
+	c.SetBlockAtPieceAndOffset(0, 0, make([]byte, 16384))
 	if c.HaveBlockAtPieceAndOffset(0, 0) != true {
 		test.Error("Failed block set", c)
 	}
