@@ -10,7 +10,6 @@ func main() {
 	peers_info := tracker_proxy.GetPeers()
 	c := make(chan Message)
 	for _, p := range peers_info {
-		fmt.Println("CREATING NEW PEER:", peers_info)
 		go CreatePeer(p, torrent, c)
 	}
 

@@ -168,10 +168,22 @@ func (p *Peer) act() {
 			switch {
 			case !p.connection_info.am_interested:
 				p.connection_info.am_interested = true
+				fmt.Println("Sending Interested")
 				p.Send(InterestedMessage{}.bytes())
+			case !p.connection_info.peer_choking:
+				m := RequestMessage{}
+				m.index = n
+				m.begin = b
+				m.length = int(block_size)
+				fmt.Println("Sending request")
+				p.Send(m.bytes())
+			}
+		} else {
+			switch{
+			case p.connection_info.am_interested:
+				p.Send(NotInterestedMessage{}.bytes())
 			}
 		}
-		
 	}
 }
 

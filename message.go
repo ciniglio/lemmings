@@ -18,6 +18,7 @@ const (
 	port
 
 	i_get_request
+	i_sent_request
 )
 
 type Message interface {
@@ -95,7 +96,7 @@ func (c RequestMessage) kind() kind { return request }
 
 func (m RequestMessage) bytes() []byte {
 	b := make([]byte, 0)
-	b = append(b, to4Bytes(uint32(15))...)
+	b = append(b, to4Bytes(uint32(13))...)
 	b = append(b, byte(request))
 	b = append(b, to4Bytes(uint32(m.index))...)
 	b = append(b, to4Bytes(uint32(m.begin))...)
@@ -131,3 +132,10 @@ type InternalGetRequestMessage struct {
 }
 
 func (c InternalGetRequestMessage) kind() kind { return i_get_request }
+
+type InternalSendingRequestMessage struct {
+	index int
+	begin int
+}
+
+func (c InternalSendingRequestMessage) kind() kind { return i_sent_request }
