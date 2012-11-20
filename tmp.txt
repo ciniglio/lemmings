@@ -1,0 +1,11 @@
+
+Reader routine parses messages and deposits them in channel
+C
+Separate consumer routine handles fully formed messages
+C
+Sender routine that knows how to send fully formed messages
+
+Message interface {read, write} 
+        Read([byte]) -> Message
+        Write([message]) -> []Bytes
+
