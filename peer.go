@@ -8,6 +8,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"time"
 )
 
 var block_size uint32 = 16384
@@ -29,13 +30,14 @@ type HandshakeMessage struct {
 
 type Peer struct {
 	torrent_info    *TorrentInfo
-	torrent_peer    *torrentPeer
+	torrent_peer    torrentPeer
 	connection      *net.TCPConn
 	connection_info *PeerConnectionInfo
 	their_id        [20]byte
 	shook_hands     bool
-	receiving_chan  chan []byte
 	their_pieces    *Pieces
+	messageChannel  chan Message
+	clientChannel   chan Message
 }
 
 func InitialConnectionInfo() *PeerConnectionInfo {
@@ -46,6 +48,7 @@ func InitialConnectionInfo() *PeerConnectionInfo {
 }
 
 func (peer *Peer) connect() bool {
+	fmt.Println("Calling connect(): ", peer)
 	p := peer.torrent_peer
 	dest_addr := new(net.TCPAddr)
 	dest_addr.IP = net.ParseIP(p.ip)
@@ -62,52 +65,113 @@ func (peer *Peer) connect() bool {
 		fmt.Println("Couldn't connect: ", err)
 		return false
 	} else {
-		fmt.Println("Connected to a peer")
+		fmt.Println("Connected to a peer: ", dest_addr.IP, dest_addr.Port)
 	}
 	peer.connection.SetKeepAlive(true)
 
 	return true
 }
 
-func CreatePeer(p *torrentPeer, t *TorrentInfo) *Peer {
+func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 	peer := new(Peer)
 	peer.torrent_info = t
 	peer.torrent_peer = p
+	fmt.Println("Peer in CreatePeer", p)
 
 	if !peer.connect() {
 		fmt.Println("Connection problem")
 		return nil
 	}
 	peer.connection_info = InitialConnectionInfo()
-	peer.receiving_chan = make(chan []byte)
-
 	peer.their_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
-
+	peer.messageChannel = make(chan Message)
+	peer.clientChannel = m
 	peer.runPeer()
 	return peer
 }
 
 func (peer *Peer) runPeer() {
-	go peer.readerRoutine()
 	peer.initiateHandshake()
+	go peer.readerRoutine()
 	fmt.Println("Sent Handshake")
-	var data []byte
 	for {
 		runtime.Gosched()
-		peer.readRawBytesFromConnection(&data)
-		if len(data) > 0 {
-			// recv
-			if msg, _ := peer.parseHandshakeMessage(&data); msg == nil {
-				peer.parseProtocolMessage(&data)
-//				fmt.Printf("Data has %d bytes: % X\n", len(data), data)
+		select {
+		case msg := <-peer.messageChannel:
+			switch msg.kind() {
+			case choke:
+				fmt.Println("Choked")
+				peer.connection_info.peer_choking = true
+			case unchoke:			
+				fmt.Println("Unchoked")
+				peer.connection_info.peer_choking = false
+			case interested:
+				fmt.Println("Interested")
+				peer.connection_info.peer_interested = true
+			case not_interested:
+				fmt.Println("Not Interested")
+				peer.connection_info.peer_interested = false
+			case bitfield:
+				fmt.Println("BitField")
+				peer.handleBitField(msg.(BitFieldMessage))
+			case have:
+				fmt.Println("Have")
+				peer.handleHave(msg.(HaveMessage))
+			case request:
+				fmt.Println("Request")
+				// talk to client, see if we have it, send piece
+				peer.handleRequest(msg.(RequestMessage))
+			case piece_t:
+				fmt.Println("Piece")
+				// talk to client
+				peer.handlePiece(msg.(PieceMessage))
+			//case client_have: 
+				// client tells me we just recvd piece
+				// I send haves and cancels
 			}
-		} else {
-			// send
-			piece, offset := peer.torrent_info.our_pieces.GetPieceAndOffsetForRequest(peer.their_pieces)
-			if piece >= 0 && offset >= 0 {
-				peer.attemptRequest(piece, offset)
+		default:
+			//fmt.Println("Thinking about sending")
+			peer.act()
+		}
+	}
+}
+
+func (p *Peer) Send(b []byte) {
+	n := 0
+	var err error
+	for n < len(b) {
+		b = b[n:]
+		n, err = p.connection.Write(b)
+		if err != nil {
+			fmt.Println("Send error", err)
+		}
+	}
+}
+
+func (p *Peer) GetIndexAndBeginForRequest() (int, int) {
+	m := new(InternalGetRequestMessage)
+	m.pieces = p.their_pieces
+	m.ret = make(chan int, 2)
+	p.clientChannel <- m
+	index := <- m.ret
+	begin := <- m.ret
+	return index, begin
+}
+
+func (p *Peer) act() {
+	switch {
+	case p.connection_info.am_interested && p.connection_info.peer_choking:
+		//p.Send(UnchokeMessage{}.bytes())
+	default:
+		n, b := p.GetIndexAndBeginForRequest()
+		if n >= 0 && b >= 0 {
+			switch {
+			case !p.connection_info.am_interested:
+				p.connection_info.am_interested = true
+				p.Send(InterestedMessage{}.bytes())
 			}
 		}
+		
 	}
 }
 
@@ -168,65 +232,18 @@ func (p *Peer) keepAlive() {
 	p.connection.Write([]byte("\x00\x00"))
 }
 
-func (peer *Peer) parseProtocolMessage(b *[]byte) {
-	m := *b
-	curpos := 0
 
-	size := 4 + toInt(m[:4])
-	if size > len(m) {
-		// need to wait for more data
-		//fmt.Printf("Message split across packets")
-		return
-	}
-	curpos += size
-	switch {
-	case bytes.Compare(m[:4], []byte("\x00\x00\x00\x00")) == 0:
-		fmt.Printf("Keep Alive\n")
-	case bytes.Compare(m[:4], []byte("\x00\x00\x00\x01")) == 0:
-		fmt.Println("Choke/Unchoke/Interested/Uninterested")
-		peer.recieveChokeAndInterest(m[4:curpos])
-	case bytes.Compare(m[:4], []byte("\x00\x00\x00\x05")) == 0 &&
-		bytes.Compare(m[4:5], []byte("\x04")) == 0:
-		fmt.Println("Recieved HAVE")
-		peer.recieveHaveMessage(m[5:curpos])
-	case bytes.Compare(m[4:5], []byte("\x05")) == 0:
-		fmt.Println("Recieved BitField")
-		peer.recieveBitField(m[5:curpos])
-	case bytes.Compare(m[4:5], []byte("\x06")) == 0:
-		fmt.Println("Recieved request")
-		peer.recieveRequest(m[5:curpos])
-	case bytes.Compare(m[4:5], []byte("\x07")) == 0:
-		fmt.Println("Recieved Piece")
-		peer.recievePiece(m[5:curpos])
-	case bytes.Compare(m[4:5], []byte("\x08")) == 0:
-		fmt.Println("Recieved Cancel")
-		//peer.recieveCancel(m[3:curpos])
-	case bytes.Compare(m[4:5], []byte("\x09")) == 0:
-		fmt.Println("Recieved Port")
-	default:
-		fmt.Println("Recieved unknown")
-	}
-	if curpos != len(m) {
-		*b = m[curpos:]
-	} else {
-		*b = nil
-	}
-		
-	return
-}
-
-func (p *Peer) recievePiece(b []byte) {
+func (p *Peer) handlePiece(m PieceMessage) {
 	//fmt.Printf("Piece: %X", b)
-	fmt.Printf("Piece: %X\n", b[:10])
-	piece := toInt(b[:4])
-	offset := toInt(b[4:8])
-	p.torrent_info.our_pieces.SetBlockAtPieceAndOffset(piece, offset, b[8:])
+	fmt.Printf("Piece: %v\n", m)
+	p.torrent_info.our_pieces.SetBlockAtPieceAndOffset(m.index, m.begin, m.block)
 }
 
-func (peer *Peer) recieveRequest(b []byte) {
+func (peer *Peer) handleRequest(m RequestMessage) {
 }
 
-func (peer *Peer) recieveBitField(b []byte) {
+func (peer *Peer) handleBitField(m BitFieldMessage) {
+	b := m.bitfield
 	ind := 0
 	for _, by := range b {
 		for j := 7; j >= 0; j-- {
@@ -240,62 +257,91 @@ func (peer *Peer) recieveBitField(b []byte) {
 	}
 }
 
-func (peer *Peer) recieveHaveMessage(b []byte) {
-	i := toInt(b)
-	peer.their_pieces.setAtIndex(i, true)
-}
-
-func (peer *Peer) recieveChokeAndInterest(b []byte) {
-	switch {
-	case bytes.Compare(b, []byte("\x00")) == 0:
-		fmt.Println("Got choked")
-		peer.connection_info.peer_choking = true
-	case bytes.Compare(b, []byte("\x01")) == 0:
-		fmt.Println("Got unchoked")
-		peer.connection_info.peer_choking = false
-	case bytes.Compare(b, []byte("\x02")) == 0:
-		fmt.Println("Got interest")
-		peer.connection_info.peer_interested = true
-	case bytes.Compare(b, []byte("\x03")) == 0:
-		fmt.Println("Got uninterest")
-		peer.connection_info.peer_interested = false
-
-	}
+func (peer *Peer) handleHave(m HaveMessage) {
+	peer.their_pieces.setAtIndex(m.index, true)
 }
 
 func (p *Peer) readerRoutine() {
+	var buffer []byte
 	for {
+		fmt.Println("Reader Routine", time.Now())
 		bufsize := 1024
-		var tmp []byte
 		data := make([]byte, bufsize)
 		n, err := p.connection.Read(data)
-
+		fmt.Printf("Read %d bytes @ %v\n", n, time.Now())
 		if err != io.EOF && err != nil {
 			fmt.Printf("Read %d bytes\n", n)
-			fmt.Println("Reading from connection: ", err)
-			p.connect()
+			fmt.Println("Reading from connection: ", err, time.Now())
+			return
 		}
+
 		if n > 0 {
-			tmp = append(tmp, data[0:n]...)
-			p.receiving_chan <- tmp
+			buffer = append(buffer, data[0:n]...)
+		}
+		if len(buffer) < 4 {
+			continue
+		}
+
+		p.parseHandshakeMessage(&buffer)
+
+		for msg, curpos := parseBytesToMessage(buffer); msg != nil; {
+			buffer = buffer[curpos:]
+			if msg != nil {
+				p.messageChannel <- msg
+			}
+			msg, curpos = parseBytesToMessage(buffer)			
 		}
 	}
 }
 
-func (p *Peer) readRawBytesFromConnection(out *[]byte) int {
-	readcount := 0
-	c := p.receiving_chan
-
-	select {
-	case data := <-c:
-		//fmt.Println("Recieving data")
-		n := len(data)
-		readcount += n
-		*out = append(*out, data[0:n]...)
-	default:
-		return 0
+func parseBytesToMessage(buffer []byte) (Message, int) {
+	if len(buffer) < 4 {
+		return nil, 0
 	}
-	return readcount
+
+	var msg Message
+	size := 4 + toInt(buffer[:4])
+	id := 0
+	if size > 0 {
+		id = toInt(buffer[4:5])
+	}
+	if size > len(buffer) {
+		return nil, 0
+	}
+	curpos := size
+	switch {
+	case size == 0:
+		//do nothing
+	default:
+		switch id {
+		case 0: 
+			msg = ChokeMessage{}
+		case 1:
+			msg = UnchokeMessage{}
+		case 2: 
+			msg = InterestedMessage{}
+		case 3: 
+			msg = NotInterestedMessage{}
+		case 4:
+			msg = HaveMessage{index: toInt(buffer[5:curpos])}
+		case 5:
+			msg = BitFieldMessage{bitfield: buffer[5:curpos]}
+		case 6:
+			index := toInt(buffer[5:9])
+			begin := toInt(buffer[9:13])
+			length := toInt(buffer[13:17])
+			msg = RequestMessage{index: index, begin: begin, length: length}
+		case 7:
+			index := toInt(buffer[5:9])
+			begin := toInt(buffer[9:13])
+			block := buffer[13:curpos]
+			msg = PieceMessage{index: index, begin: begin, block: block}
+		default: 
+			msg = CancelMessage{}
+		}
+	}
+
+	return msg, curpos
 }
 
 func (p *Peer) parseHandshakeMessage(b *[]byte) (*HandshakeMessage, int) {
@@ -352,6 +398,7 @@ func (p *Peer) initiateHandshake() {
 		binary.BigEndian, &message.peer_id)
 
 	p.connection.Write(message.bytes())
+	fmt.Printf("msg %x", message.bytes())
 
 	return
 }
