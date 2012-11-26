@@ -10,7 +10,7 @@ func main() {
 		fmt.Println("Error: ", err)
 		return
 	}
-	tracker_proxy := CreateTrackerProxy(torrent)
+	tracker_proxy := NewTrackerProxy(torrent)
 	peers_info := tracker_proxy.GetPeers()
 	c := make(chan Message)
 	for _, p := range peers_info {

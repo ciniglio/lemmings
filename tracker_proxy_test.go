@@ -11,7 +11,7 @@ func Test_TGR_1(test *testing.T) {
 	t.info_hash = "hash"
 	t.client_id = "id"
 	t.announce = "http://example.com"
-	tgr := CreateTrackerProxy(t)
+	tgr := NewTrackerProxy(t)
 
 	s := tgr.GenerateGetString()
 	if (s != "http://example.com?info_hash=hash&peer_id=id") &&
@@ -28,7 +28,7 @@ func Test_Escaping(test *testing.T) {
 	t.info_hash = string(b)
 	t.client_id = "1"
 	t.announce = "http://example.com"
-	tgr := CreateTrackerProxy(t)
+	tgr := NewTrackerProxy(t)
 
 	s := tgr.GenerateGetString()
 	if (s != "http://example.com?info_hash=%124Vx%9A%BC%DE%F1%23Eg%89%AB%CD%EF%124Vx%9A&peer_id=1") &&
@@ -43,6 +43,6 @@ func Test_Connection_1(test *testing.T) {
 		len(ti.files) != 1 || ti.files[0].length != 1751391 {
 		test.Error("Failed at parsing file", ti.announce)
 	}
-	tgr := CreateTrackerProxy(ti)
+	tgr := NewTrackerProxy(ti)
 	tgr.MakeTrackerRequest()
 }

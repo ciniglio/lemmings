@@ -44,7 +44,7 @@ type TrackerResponse struct {
 	peers          []torrentPeer
 }
 
-func CreateTrackerProxy(t *TorrentInfo) *TrackerGetRequest {
+func NewTrackerProxy(t *TorrentInfo) *TrackerGetRequest {
 	tgr := new(TrackerGetRequest)
 	tgr.info_hash = t.info_hash
 	tgr.peer_id = t.client_id
