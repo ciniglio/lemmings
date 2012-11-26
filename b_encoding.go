@@ -1,3 +1,10 @@
+/******************************************************************************/
+/**                                                                          **/
+/**       b_encoding                                                         **/
+/**   Spec: http://www.bittorrent.org/beps/bep_0003.html                     **/
+/**                                                                          **/
+/******************************************************************************/
+
 package tracker
 
 import (
@@ -5,12 +12,14 @@ import (
 	"strconv"
 )
 
+// this is what a bencoding is made up of, it can nest itself as well
+// only one of the instance objects should exist for each bItem
 type bItem struct {
-	s   string
-	i   int64
-	l   []bItem
-	d   map[string]bItem
-	raw []byte
+	s   string           // string type
+	i   int64            // integer type
+	l   []bItem          // list type
+	d   map[string]bItem // dictionary strings => bItems
+	raw []byte           // this contains the raw string that was decoded into this bItem
 }
 
 type bError struct {
@@ -20,15 +29,20 @@ func (e *bError) Error() string {
 	return "bError happened"
 }
 
+// if an integer, let's just convert it from a string
 func bdecodeInt(p []byte) int64 {
 	i, _ := strconv.Atoi(string(p))
 	return int64(i)
 }
 
+// if a string, let's return the string
 func bdecodeString(p []byte) string {
 	return string(p)
 }
 
+// assumes that p corresponds to exactly 1 bItem. 
+// e.g. i8ei9e would only return 8, li8ei9ee would pass
+// recursive function
 func Bdecode(p []byte) (*bItem, int) {
 	bi := new(bItem)
 	progress := 0
@@ -36,12 +50,15 @@ func Bdecode(p []byte) (*bItem, int) {
 
 	switch p[0] {
 	case 'e':
+		// reached the end of an item, do nothing except advance
 		progress = 1
 	case 'i':
+		// number goes until the first e
 		end = bytes.IndexByte(p[0:], 'e')
 		bi.i = bdecodeInt(p[1:end])
 		progress = end + 1
 	case 'l':
+		// parse list until we reach empty item
 		bi.l = (make([]bItem, 0))
 		start := 1
 		q := 0
@@ -49,6 +66,7 @@ func Bdecode(p []byte) (*bItem, int) {
 		for {
 			i, q = Bdecode(p[start:])
 			if q == 1 {
+				// reached empty item; stop
 				break
 			}
 			bi.l = append(bi.l, *i)
@@ -56,6 +74,7 @@ func Bdecode(p []byte) (*bItem, int) {
 		}
 		progress = start
 	case 'd':
+		// parse dictionary until we reach empty item
 		bi.d = make(map[string]bItem)
 		start := 1
 		for {
@@ -65,6 +84,7 @@ func Bdecode(p []byte) (*bItem, int) {
 			}
 			start += q
 			j, r := Bdecode(p[start:])
+			// dict[i.string] = j
 			bi.d[i.s] = *j
 			start += r
 		}
@@ -81,7 +101,14 @@ func Bdecode(p []byte) (*bItem, int) {
 	return bi, progress
 }
 
+////////////////////////////////////////////////////////////////////////////////
+///////
+/////// Encoding functions
+///////
+////////////////////////////////////////////////////////////////////////////////
+
 func bencodeInt(i int64) []byte {
+	// straightforward iXe (x is int)
 	out := []byte{}
 	out = append(out, byte('i'))
 	out = append(out, strconv.Itoa(int(i))...)
@@ -90,6 +117,7 @@ func bencodeInt(i int64) []byte {
 }
 
 func bencodeString(s string) []byte {
+	// straightforward len:string
 	out := []byte{}
 	out = append(out, strconv.Itoa(len(s))...)
 	out = append(out, ':')
@@ -101,21 +129,31 @@ func Bencode(b bItem) []byte {
 	out := []byte{}
 	switch {
 	case len(b.d) > 0:
+		// if we have a dict, lets prefix with a d,
 		out = append(out, byte('d'))
+
+		// then encode all of it's members
 		for k, v := range b.d {
 			out = append(out, bencodeString(k)...)
 			out = append(out, Bencode(v)...)
 		}
+
+		// then e as suffix
 		out = append(out, byte('e'))
 	case len(b.l) > 0:
+		//if we have a list, we prefix with l
 		out = append(out, byte('l'))
+		// then encode all members
 		for _, i := range b.l {
 			out = append(out, Bencode(i)...)
 		}
+		// then suffix with e
 		out = append(out, byte('e'))
 	case len(b.s) > 0:
+		// trivial case -> encode string
 		out = append(out, bencodeString(b.s)...)
 	default:
+		// trivial case -> encode int
 		out = append(out, bencodeInt(b.i)...)
 	}
 	return out
