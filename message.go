@@ -1,7 +1,6 @@
 package tracker
 
-import (
-)
+import ()
 
 type kind int
 
@@ -25,10 +24,10 @@ type Message interface {
 	kind() kind
 }
 
-type ChokeMessage struct {}
-type UnchokeMessage struct {}
-type InterestedMessage struct {}
-type NotInterestedMessage struct {}
+type ChokeMessage struct{}
+type UnchokeMessage struct{}
+type InterestedMessage struct{}
+type NotInterestedMessage struct{}
 
 func (c ChokeMessage) kind() kind { return choke }
 
@@ -87,8 +86,8 @@ type BitFieldMessage struct {
 func (c BitFieldMessage) kind() kind { return bitfield }
 
 type RequestMessage struct {
-	index int
-	begin int
+	index  int
+	begin  int
 	length int
 }
 
@@ -114,7 +113,7 @@ func (c PieceMessage) kind() kind { return piece_t }
 
 func (m PieceMessage) bytes() []byte {
 	b := make([]byte, 0)
-	b = append(b, to4Bytes(uint32(9 + len(m.block)))...)
+	b = append(b, to4Bytes(uint32(9+len(m.block)))...)
 	b = append(b, byte(piece_t))
 	b = append(b, to4Bytes(uint32(m.index))...)
 	b = append(b, to4Bytes(uint32(m.begin))...)
@@ -122,7 +121,7 @@ func (m PieceMessage) bytes() []byte {
 	return b
 }
 
-type CancelMessage struct {}
+type CancelMessage struct{}
 
 func (c CancelMessage) kind() kind { return cancel }
 

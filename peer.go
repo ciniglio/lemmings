@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var block_size uint32 = 16384
+var block_size int64 = 16384
 
 type PeerConnectionInfo struct {
 	peer_choking    bool
@@ -29,15 +29,16 @@ type HandshakeMessage struct {
 }
 
 type Peer struct {
-	torrent_info    *TorrentInfo
-	torrent_peer    torrentPeer
-	connection      *net.TCPConn
-	connection_info *PeerConnectionInfo
-	their_id        [20]byte
-	shook_hands     bool
-	their_pieces    *Pieces
-	messageChannel  chan Message
-	clientChannel   chan Message
+	torrent_info              *TorrentInfo
+	torrent_peer              torrentPeer
+	connection                *net.TCPConn
+	connection_info           *PeerConnectionInfo
+	their_id                  [20]byte
+	shook_hands               bool
+	their_pieces              *Pieces
+	outstanding_request_count int
+	messageChannel            chan Message
+	clientChannel             chan Message
 }
 
 func InitialConnectionInfo() *PeerConnectionInfo {
@@ -102,7 +103,7 @@ func (peer *Peer) runPeer() {
 			case choke:
 				fmt.Println("Choked")
 				peer.connection_info.peer_choking = true
-			case unchoke:			
+			case unchoke:
 				fmt.Println("Unchoked")
 				peer.connection_info.peer_choking = false
 			case interested:
@@ -125,12 +126,11 @@ func (peer *Peer) runPeer() {
 				fmt.Println("Piece")
 				// talk to client
 				peer.handlePiece(msg.(PieceMessage))
-			//case client_have: 
+				//case client_have: 
 				// client tells me we just recvd piece
 				// I send haves and cancels
 			}
 		default:
-			//fmt.Println("Thinking about sending")
 			peer.act()
 		}
 	}
@@ -153,9 +153,35 @@ func (p *Peer) GetIndexAndBeginForRequest() (int, int) {
 	m.pieces = p.their_pieces
 	m.ret = make(chan int, 2)
 	p.clientChannel <- m
-	index := <- m.ret
-	begin := <- m.ret
+	index := <-m.ret
+	begin := <-m.ret
 	return index, begin
+}
+
+func (p *Peer) SendRequest(index, begin int) {
+	if p.outstanding_request_count < 2 {
+		m := RequestMessage{}
+		m.index = index
+		m.begin = begin
+		length := block_size
+
+		if index == p.their_pieces.Length()-1 {
+			rem := p.torrent_info.total_length % p.torrent_info.pieceLength
+			last_ind := int(rem / block_size)
+			if begin == last_ind {
+				length = p.torrent_info.total_length % block_size
+				fmt.Println("Last block, length: ", length)
+			}
+		}
+		m.length = int(length)
+		p.outstanding_request_count += 1
+		p.Send(m.bytes())
+		fmt.Println("Sending request")
+		n := new(InternalSendingRequestMessage)
+		n.index = index
+		n.begin = begin
+		p.clientChannel <- n
+	}
 }
 
 func (p *Peer) act() {
@@ -171,15 +197,10 @@ func (p *Peer) act() {
 				fmt.Println("Sending Interested")
 				p.Send(InterestedMessage{}.bytes())
 			case !p.connection_info.peer_choking:
-				m := RequestMessage{}
-				m.index = n
-				m.begin = b
-				m.length = int(block_size)
-				fmt.Println("Sending request")
-				p.Send(m.bytes())
+				p.SendRequest(n, b)
 			}
 		} else {
-			switch{
+			switch {
 			case p.connection_info.am_interested:
 				p.Send(NotInterestedMessage{}.bytes())
 			}
@@ -187,68 +208,9 @@ func (p *Peer) act() {
 	}
 }
 
-func (p *Peer) attemptRequest(piece, offset int) {
-	if p.connection_info.peer_choking {
-		p.attemptInterested()
-	} else {
-		p.sendRequest(piece, offset)
-	}
-}
-
-func (p *Peer) sendRequest(piece, offset int) {
-	b := []byte("\x00\x00\x00\x0D")
-	b = append(b, byte(6))
-	b = append(b, to4Bytes(uint32(piece))...)
-	b = append(b, to4Bytes(uint32(offset))...)
-	b = append(b, to4Bytes(block_size)...)
-	n, err := p.connection.Write(b)
-	if err != nil {
-		fmt.Println("Send error", err)
-	} else {
-		fmt.Printf("Sent request: %d bytes\n", n)
-	}
-}
-
-func (p *Peer) attemptInterested() {
-	if !p.connection_info.am_interested {
-		p.connection_info.am_interested = true
-		p.sendUnchoke()
-		p.sendInterested()
-	}
-}
-
-
-func (p *Peer) sendUnchoke() {
-	fmt.Println("Sending Unchoke message")
-	n, err := p.connection.Write([]byte("\x00\x00\x00\x01\x01"))
-	if err != nil {
-		fmt.Println("Send error", err)
-	} else {
-		fmt.Printf("Sent %d bytes\n", n)
-	}
-}
-
-
-func (p *Peer) sendInterested() {
-	fmt.Println("Sending Interested message")
-	n, err := p.connection.Write([]byte("\x00\x00\x00\x01\x02"))
-	if err != nil {
-		fmt.Println("Send error", err)
-	} else {
-		fmt.Printf("Sent %d bytes\n", n)
-	}
-}
-
-func (p *Peer) keepAlive() {
-	fmt.Println("Sending Keep Alive")
-	p.connection.Write([]byte("\x00\x00"))
-}
-
-
 func (p *Peer) handlePiece(m PieceMessage) {
-	//fmt.Printf("Piece: %X", b)
-	fmt.Printf("Piece: %v\n", m)
-	p.torrent_info.our_pieces.SetBlockAtPieceAndOffset(m.index, m.begin, m.block)
+	p.outstanding_request_count -= 1
+	p.clientChannel <- m
 }
 
 func (peer *Peer) handleRequest(m RequestMessage) {
@@ -276,11 +238,11 @@ func (peer *Peer) handleHave(m HaveMessage) {
 func (p *Peer) readerRoutine() {
 	var buffer []byte
 	for {
-		fmt.Println("Reader Routine", time.Now())
+		//fmt.Println("Reader Routine", time.Now())
 		bufsize := 1024
 		data := make([]byte, bufsize)
 		n, err := p.connection.Read(data)
-		fmt.Printf("Read %d bytes @ %v\n", n, time.Now())
+
 		if err != io.EOF && err != nil {
 			fmt.Printf("Read %d bytes\n", n)
 			fmt.Println("Reading from connection: ", err, time.Now())
@@ -288,6 +250,7 @@ func (p *Peer) readerRoutine() {
 		}
 
 		if n > 0 {
+			fmt.Printf("Read %d bytes @ %v\n", n, time.Now())
 			buffer = append(buffer, data[0:n]...)
 		}
 		if len(buffer) < 4 {
@@ -301,7 +264,7 @@ func (p *Peer) readerRoutine() {
 			if msg != nil {
 				p.messageChannel <- msg
 			}
-			msg, curpos = parseBytesToMessage(buffer)			
+			msg, curpos = parseBytesToMessage(buffer)
 		}
 	}
 }
@@ -325,14 +288,15 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	case size == 0:
 		//do nothing
 	default:
+		fmt.Println("Parsing Message, ID: ", id)
 		switch id {
-		case 0: 
+		case 0:
 			msg = ChokeMessage{}
 		case 1:
 			msg = UnchokeMessage{}
-		case 2: 
+		case 2:
 			msg = InterestedMessage{}
-		case 3: 
+		case 3:
 			msg = NotInterestedMessage{}
 		case 4:
 			msg = HaveMessage{index: toInt(buffer[5:curpos])}
@@ -348,7 +312,7 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 			begin := toInt(buffer[9:13])
 			block := buffer[13:curpos]
 			msg = PieceMessage{index: index, begin: begin, block: block}
-		default: 
+		default:
 			msg = CancelMessage{}
 		}
 	}

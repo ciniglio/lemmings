@@ -11,16 +11,17 @@ type torrentFile struct {
 }
 
 type TorrentInfo struct {
-	announce    string   // tracker url
-	name        string   // filename or dirname depending on length of files
-	pieceLength int64    // size of each piece in bytes
-	pieces      []string // checksums for each piece
-	numpieces   int
-	files       []torrentFile // info for each file
-	numfiles    int64         // not part of file, but helpful
-	info_hash   string        // sha1 of info dict
-	client_id   string        // randomly generated 20 bytes
-	our_pieces  *Pieces
+	announce     string   // tracker url
+	name         string   // filename or dirname depending on length of files
+	pieceLength  int64    // size of each piece in bytes
+	pieces       []string // checksums for each piece
+	numpieces    int
+	files        []torrentFile // info for each file
+	numfiles     int64         // not part of file, but helpful
+	info_hash    string        // sha1 of info dict
+	client_id    string        // randomly generated 20 bytes
+	our_pieces   *Pieces
+	total_length int64
 }
 
 func ReadTorrentFile(path string) *TorrentInfo {
@@ -58,7 +59,10 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 	}
 
 	t.numpieces = len(t.pieces)
+
 	t.our_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
+
+	t.total_length = 0
 
 	if info["length"].i > 0 {
 		f := new(torrentFile)
@@ -66,6 +70,7 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 		f.path = t.name
 		t.files = append(t.files, *f)
 		t.numfiles = 1
+		t.total_length += f.length
 	} else {
 		t.numfiles = 0
 		for _, v := range info["files"].l {
@@ -74,6 +79,7 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 			f.path = v.d["path"].s
 			t.files = append(t.files, *f)
 			t.numfiles++
+			t.total_length += f.length
 		}
 	}
 

@@ -20,6 +20,14 @@ func main() {
 			i, b := torrent.our_pieces.GetPieceAndOffsetForRequest(msg.pieces)
 			msg.ret <- i
 			msg.ret <- b
+		case i_sent_request:
+			msg := m.(*InternalSendingRequestMessage)
+			i := msg.index
+			b := msg.begin
+			torrent.our_pieces.RequestedPieceAndOffset(i, b)
+		case piece_t:
+			msg := m.(PieceMessage)
+			torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
 		default:
 			fmt.Println("Got weird internal request")
 		}

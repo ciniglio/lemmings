@@ -5,18 +5,17 @@ import (
 )
 
 type piece struct {
-	have      bool
-	requested bool
-	blocks    []bool
+	have             bool
+	requested        bool
+	blocks           []bool
 	blocks_requested []bool
-	data      []byte
+	data             []byte
 }
 
 type Pieces struct {
 	pieces       []piece
 	piece_length int
 }
-
 
 func (p *Pieces) Length() int {
 	return len(p.pieces)
@@ -56,9 +55,11 @@ func (p *Pieces) String() string {
 	}
 	return string(s)
 }
-func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int){
+func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
+		// for an incomplete piece that is in progress, get
+		// remaining blocks
 		if !p.have && p.requested && theirs.pieces[i].have {
 			for j, b := range p.blocks {
 				if !b && !p.blocks_requested[j] {
@@ -66,28 +67,38 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int){
 				}
 			}
 		}
+		// otherwise, let's make an array of missing pieces
 		if !p.have && theirs.pieces[i].have {
 			indices = append(indices, i)
 		}
 	}
+
+	// if there are no missing pieces, return -1
 	if len(indices) <= 0 {
 		return -1, -1
 	}
-	ind := indices[RandomInt(len(indices))]
+
+	// get random piece index and set up for requesting
+	ind := indices[0] //indices[RandomInt(len(indices))]
 	if ours.pieces[ind].blocks == nil {
 		ours.initBlocksAtPiece(ind)
 	}
+	// get random block index for request
 	indices = make([]int, 0)
 	for i, b := range ours.pieces[ind].blocks {
 		if !b {
 			indices = append(indices, i)
 		}
 	}
+
+	// if no blocks are un-filled return -1
 	if len(indices) <= 0 {
 		return -1, -1
 	}
 
-	off := indices[RandomInt(len(indices))]
+	// otherwise return random block offset too.
+	off := indices[0] //indices[RandomInt(len(indices))]
+
 	return ind, off
 }
 
@@ -102,7 +113,7 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 	if i >= p.Length() || offset >= p.lengthBlocksInPiece(i) {
 		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
 		fmt.Printf("Compare to index: %d\n", p.Length())
-		
+
 		return
 	}
 	if len(b) < 16384 && i < (p.Length()-1) {
@@ -118,7 +129,9 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 
 func (p *Pieces) checkPiece(i int) {
 	for _, b := range p.pieces[i].blocks {
-		if !b { return }
+		if !b {
+			return
+		}
 	}
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
