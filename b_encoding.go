@@ -30,9 +30,12 @@ func (e *bError) Error() string {
 }
 
 // if an integer, let's just convert it from a string
-func bdecodeInt(p []byte) int64 {
-	i, _ := strconv.Atoi(string(p))
-	return int64(i)
+func bdecodeInt(p []byte) (int64, error) {
+	i, err := strconv.Atoi(string(p))
+	if err != nil {
+		return 0, new(bError)
+	}
+	return int64(i), nil
 }
 
 // if a string, let's return the string
@@ -47,7 +50,6 @@ func Bdecode(p []byte) (*bItem, int) {
 	bi := new(bItem)
 	progress := 0
 	end := 0
-
 	switch p[0] {
 	case 'e':
 		// reached the end of an item, do nothing except advance
@@ -55,7 +57,11 @@ func Bdecode(p []byte) (*bItem, int) {
 	case 'i':
 		// number goes until the first e
 		end = bytes.IndexByte(p[0:], 'e')
-		bi.i = bdecodeInt(p[1:end])
+		var err error
+		bi.i, err = bdecodeInt(p[1:end])
+		if err != nil {
+			return nil, -1
+		}
 		progress = end + 1
 	case 'l':
 		// parse list until we reach empty item
@@ -65,6 +71,9 @@ func Bdecode(p []byte) (*bItem, int) {
 		var i *bItem
 		for {
 			i, q = Bdecode(p[start:])
+			if i == nil {
+				return nil, -1
+			}
 			if q == 1 {
 				// reached empty item; stop
 				break
@@ -79,11 +88,17 @@ func Bdecode(p []byte) (*bItem, int) {
 		start := 1
 		for {
 			i, q := Bdecode(p[start:])
+			if i == nil {
+				return nil, -1
+			}
 			if q == 1 {
 				break
 			}
 			start += q
 			j, r := Bdecode(p[start:])
+			if j == nil {
+				return nil, -1
+			}
 			// dict[i.string] = j
 			bi.d[i.s] = *j
 			start += r
@@ -92,7 +107,10 @@ func Bdecode(p []byte) (*bItem, int) {
 	default:
 		// String
 		end = bytes.IndexByte(p[0:], ':')
-		length := bdecodeInt(p[0:end])
+		length, err := bdecodeInt(p[0:end])
+		if err != nil {
+			return nil, -1
+		}
 		end++
 		bi.s = bdecodeString(p[end : end+int(length)])
 		progress = end + int(length)

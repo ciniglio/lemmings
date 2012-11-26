@@ -50,7 +50,7 @@ func Test_DecodeList_1(t *testing.T) {
 		"l3:cow3:hene": []bItem{bItem{s: "cow"}, bItem{s: "hen"}},
 		"l3:cowi4ee":   []bItem{bItem{s: "cow"}, bItem{i: 4}},
 		"li5ei4ei3ee":  []bItem{bItem{i: 5}, bItem{i: 4}, bItem{i: 3}},
-		"l:3:cowi4el:i5eee": []bItem{bItem{s: "cow"}, bItem{i: 4},
+		"l3:cowi4eli5eee": []bItem{bItem{s: "cow"}, bItem{i: 4},
 			bItem{l: []bItem{bItem{i: 5}}}},
 	}
 	for k, v := range testdata {
