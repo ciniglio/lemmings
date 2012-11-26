@@ -85,9 +85,8 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 	}
 	peer.connection_info = InitialConnectionInfo()
 	peer.their_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
-	peer.messageChannel = make(chan Message)
+	peer.messageChannel = make(chan Message, 10) // magic number
 	peer.clientChannel = m
-	peer.runPeer()
 	return peer
 }
 
@@ -129,6 +128,11 @@ func (peer *Peer) runPeer() {
 				//case client_have: 
 				// client tells me we just recvd piece
 				// I send haves and cancels
+			case i_recv_block:
+				fmt.Println("Other peer recieved block")
+				peer.sendCancel(msg.(InternalReceivedBlockMessage))
+			default:
+				fmt.Println("Something weird")
 			}
 		default:
 			peer.act()
@@ -181,6 +185,30 @@ func (p *Peer) SendRequest(index, begin int) {
 		n.index = index
 		n.begin = begin
 		p.clientChannel <- n
+	}
+}
+
+func (p *Peer) sendCancel(m InternalReceivedBlockMessage) {
+	if p.outstanding_request_count > 0 {
+		if p.their_pieces.requested(m.index, m.begin) {
+			msg := new(CancelMessage)
+			msg.index = m.index
+			msg.begin = m.begin
+
+			length := block_size
+
+			if m.index == p.their_pieces.Length()-1 {
+				rem := p.torrent_info.total_length % p.torrent_info.pieceLength
+				last_ind := int(rem / block_size)
+				if m.begin == last_ind {
+					length = p.torrent_info.total_length % block_size
+					fmt.Println("Last block, length: ", length)
+				}
+			}
+			msg.length = int(length)
+			p.outstanding_request_count -= 1
+			p.Send(msg.bytes())
+		}
 	}
 }
 

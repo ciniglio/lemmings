@@ -17,8 +17,14 @@ func main() {
 
 	c := make(chan Message)
 
+	peers := make([]Peer, 0)
+
 	for p := range msg {
-		go CreatePeer(p, torrent, c)
+		peer := CreatePeer(p, torrent, c)
+		if peer != nil {
+			peers = append(peers, *peer)
+			go peer.runPeer()
+		}
 	}
 
 	for m := range c {
@@ -36,6 +42,10 @@ func main() {
 		case piece_t:
 			msg := m.(PieceMessage)
 			torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
+			for i := range peers {
+				peers[i].messageChannel <- InternalReceivedBlockMessage{index: msg.index, begin: msg.begin}
+			}
+
 		default:
 			fmt.Println("Got weird internal request")
 		}

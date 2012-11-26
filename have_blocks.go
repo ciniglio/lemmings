@@ -48,6 +48,13 @@ func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
 	p.pieces[piece].blocks_requested[offset] = true
 }
 
+func (p *Pieces) requested(index, begin int) bool {
+	if p.pieces[index].blocks == nil {
+		p.initBlocksAtPiece(index)
+	}
+	return p.pieces[index].requested && p.pieces[index].blocks_requested[begin]
+}
+
 func (p *Pieces) String() string {
 	s := []byte("")
 	for _, v := range p.pieces {
@@ -124,6 +131,7 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 	for j, by := range b {
 		p.pieces[i].data[offset+j] = by
 	}
+	p.pieces[i].blocks_requested[offset] = false
 	p.checkPiece(i)
 }
 
@@ -136,6 +144,7 @@ func (p *Pieces) checkPiece(i int) {
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
 	p.pieces[i].have = true
+	p.pieces[i].requested = false
 }
 
 func CreateNewPieces(num_pieces, piece_length int) *Pieces {

@@ -19,6 +19,7 @@ const (
 	i_get_request
 	i_sent_request
 	i_get_peers
+	i_recv_block
 )
 
 type Message interface {
@@ -122,9 +123,23 @@ func (m PieceMessage) bytes() []byte {
 	return b
 }
 
-type CancelMessage struct{}
+type CancelMessage struct {
+	index  int
+	begin  int
+	length int
+}
 
 func (c CancelMessage) kind() kind { return cancel }
+
+func (m CancelMessage) bytes() []byte {
+	b := make([]byte, 0)
+	b = append(b, to4Bytes(uint32(13))...)
+	b = append(b, byte(cancel))
+	b = append(b, to4Bytes(uint32(m.index))...)
+	b = append(b, to4Bytes(uint32(m.begin))...)
+	b = append(b, to4Bytes(uint32(m.length))...)
+	return b
+}
 
 type InternalGetRequestMessage struct {
 	pieces *Pieces
@@ -145,3 +160,10 @@ type InternalGetPeersMessage struct {
 }
 
 func (c InternalGetPeersMessage) kind() kind { return i_get_peers }
+
+type InternalReceivedBlockMessage struct {
+	index int
+	begin int
+}
+
+func (c InternalReceivedBlockMessage) kind() kind { return i_recv_block }
