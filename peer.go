@@ -84,7 +84,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 		return nil
 	}
 	peer.connection_info = InitialConnectionInfo()
-	peer.their_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
+	peer.their_pieces = CreateNewPieces(t.numpieces, t)
 	peer.messageChannel = make(chan Message, 10) // magic number
 	peer.clientChannel = m
 	return peer

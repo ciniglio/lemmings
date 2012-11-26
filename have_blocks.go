@@ -15,6 +15,8 @@ type piece struct {
 type Pieces struct {
 	pieces       []piece
 	piece_length int
+	total_length int
+	hashes       []string
 }
 
 func (p *Pieces) Length() int {
@@ -143,13 +145,16 @@ func (p *Pieces) checkPiece(i int) {
 	}
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
+	if i == 106 { fmt.Printf("Piece: %+X\n", p.pieces[i].data) }
 	p.pieces[i].have = true
 	p.pieces[i].requested = false
 }
 
-func CreateNewPieces(num_pieces, piece_length int) *Pieces {
+func CreateNewPieces(num_pieces int, t *TorrentInfo) *Pieces {
 	pieces := new(Pieces)
-	pieces.piece_length = int(piece_length)
+	pieces.piece_length = int(t.pieceLength)
+	pieces.total_length = int(t.total_length)
+	pieces.hashes = t.pieces
 	pieces.pieces = make([]piece, num_pieces)
 	return pieces
 }

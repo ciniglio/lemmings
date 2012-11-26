@@ -60,7 +60,7 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 
 	t.numpieces = len(t.pieces)
 
-	t.our_pieces = CreateNewPieces(t.numpieces, int(t.pieceLength))
+	t.our_pieces = CreateNewPieces(t.numpieces, t)
 
 	t.total_length = 0
 
