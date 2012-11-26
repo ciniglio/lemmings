@@ -38,7 +38,7 @@ func Test_Escaping(test *testing.T) {
 }
 
 func Test_Connection_1(test *testing.T) {
-	ti := ReadTorrentFile("test/test.torrent")
+	ti, _ := ReadTorrentFile("test/test.torrent")
 	if ti.announce != "http://thomasballinger.com:6969/announce" ||
 		len(ti.files) != 1 || ti.files[0].length != 1751391 {
 		test.Error("Failed at parsing file", ti.announce)

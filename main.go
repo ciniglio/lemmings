@@ -5,7 +5,11 @@ import (
 )
 
 func main() {
-	torrent := ReadTorrentFile("test/test.torrent")
+	torrent, err := ReadTorrentFile("test/test.torrent")
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
 	tracker_proxy := CreateTrackerProxy(torrent)
 	peers_info := tracker_proxy.GetPeers()
 	c := make(chan Message)

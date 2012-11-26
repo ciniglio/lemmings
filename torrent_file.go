@@ -24,12 +24,12 @@ type TorrentInfo struct {
 	total_length int64
 }
 
-func ReadTorrentFile(path string) *TorrentInfo {
+func ReadTorrentFile(path string) (*TorrentInfo, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return ParseTorrentInfo(b)
+	return ParseTorrentInfo(b), nil
 }
 
 func (t *TorrentInfo) add_info_hash(info bItem) {
