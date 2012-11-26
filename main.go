@@ -11,9 +11,13 @@ func main() {
 		return
 	}
 	tracker_proxy := NewTrackerProxy(torrent)
-	peers_info := tracker_proxy.GetPeers()
+	msg := make(chan torrentPeer)
+	get_peers := InternalGetPeersMessage{ret: msg}
+	tracker_proxy.msg <- get_peers
+
 	c := make(chan Message)
-	for _, p := range peers_info {
+
+	for p := range msg {
 		go CreatePeer(p, torrent, c)
 	}
 

@@ -13,7 +13,7 @@ func Test_TGR_1(test *testing.T) {
 	t.announce = "http://example.com"
 	tgr := NewTrackerProxy(t)
 
-	s := tgr.GenerateGetString()
+	s := tgr.tgr.GenerateGetString()
 	if (s != "http://example.com?info_hash=hash&peer_id=id") &&
 		(s != "http://example.com?peer_id=id&info_hash=hash") {
 		test.Error("failed at generating query string", s)
@@ -30,7 +30,7 @@ func Test_Escaping(test *testing.T) {
 	t.announce = "http://example.com"
 	tgr := NewTrackerProxy(t)
 
-	s := tgr.GenerateGetString()
+	s := tgr.tgr.GenerateGetString()
 	if (s != "http://example.com?info_hash=%124Vx%9A%BC%DE%F1%23Eg%89%AB%CD%EF%124Vx%9A&peer_id=1") &&
 		(s != "http://example.com?peer_id=1&info_hash=%124Vx%9A%BC%DE%F1%23Eg%89%AB%CD%EF%124Vx%9A") {
 		test.Error("failed at generating query string", s)
@@ -44,5 +44,5 @@ func Test_Connection_1(test *testing.T) {
 		test.Error("Failed at parsing file", ti.announce)
 	}
 	tgr := NewTrackerProxy(ti)
-	tgr.MakeTrackerRequest()
+	tgr.tgr.MakeTrackerRequest()
 }

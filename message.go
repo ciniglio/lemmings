@@ -18,6 +18,7 @@ const (
 
 	i_get_request
 	i_sent_request
+	i_get_peers
 )
 
 type Message interface {
@@ -138,3 +139,9 @@ type InternalSendingRequestMessage struct {
 }
 
 func (c InternalSendingRequestMessage) kind() kind { return i_sent_request }
+
+type InternalGetPeersMessage struct {
+	ret chan torrentPeer
+}
+
+func (c InternalGetPeersMessage) kind() kind { return i_get_peers }

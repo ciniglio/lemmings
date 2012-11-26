@@ -10,22 +10,21 @@ import (
 	"net/url"
 )
 
-type TrackerGetRequest struct {
-	info_hash        string
-	peer_id          string
-	port             string
-	ip_addr          string //optional
-	uploaded         int
-	downloaded       int
-	left             int
-	compact          int    // 0 or 1
-	no_peer_id       int    // 0 or 1, optional
-	event            string // started, stopped or completed (can be blank)
-	numwant          int    // optional
-	key              string // optional
-	tracker_id       string // optional
-	torrent_info     *TorrentInfo
-	tracker_response *TrackerResponse
+type trackerGetRequest struct {
+	info_hash    string
+	peer_id      string
+	port         string
+	ip_addr      string //optional
+	uploaded     int
+	downloaded   int
+	left         int
+	compact      int    // 0 or 1
+	no_peer_id   int    // 0 or 1, optional
+	event        string // started, stopped or completed (can be blank)
+	numwant      int    // optional
+	key          string // optional
+	tracker_id   string // optional
+	torrent_info *TorrentInfo
 }
 
 type torrentPeer struct {
@@ -34,7 +33,7 @@ type torrentPeer struct {
 	port    int
 }
 
-type TrackerResponse struct {
+type trackerResponse struct {
 	failure_reason string
 	interval       int
 	min_interval   int
@@ -44,15 +43,38 @@ type TrackerResponse struct {
 	peers          []torrentPeer
 }
 
-func NewTrackerProxy(t *TorrentInfo) *TrackerGetRequest {
-	tgr := new(TrackerGetRequest)
+type TrackerProxy struct {
+	tgr      *trackerGetRequest
+	response *trackerResponse
+	msg      chan Message
+}
+
+func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
+	tp := new(TrackerProxy)
+	tgr := new(trackerGetRequest)
 	tgr.info_hash = t.info_hash
 	tgr.peer_id = t.client_id
 	tgr.torrent_info = t
-	return tgr
+	tp.tgr = tgr
+	tp.msg = make(chan Message)
+	go tp.handleMessages()
+	return tp
 }
 
-func (t *TrackerGetRequest) GenerateGetString() string {
+func (t *TrackerProxy) handleMessages() {
+	for m := range t.msg {
+		switch m.kind() {
+		case i_get_peers:
+			msg := m.(InternalGetPeersMessage)
+			for _, p := range t.GetPeers() {
+				msg.ret <- p
+			}
+			close(msg.ret)
+		}
+	}
+}
+
+func (t *trackerGetRequest) GenerateGetString() string {
 	u, _ := url.Parse(t.torrent_info.announce)
 	v := url.Values{}
 	v.Set("info_hash", t.info_hash)
@@ -61,7 +83,7 @@ func (t *TrackerGetRequest) GenerateGetString() string {
 	return u.String()
 }
 
-func (t *TrackerGetRequest) MakeTrackerRequest() {
+func (t *trackerGetRequest) MakeTrackerRequest() *trackerResponse {
 	q := t.GenerateGetString()
 	fmt.Printf("Tracker Announce: %v\n\n", q)
 	res, err := http.Get(q)
@@ -74,13 +96,13 @@ func (t *TrackerGetRequest) MakeTrackerRequest() {
 		log.Fatal(err)
 	}
 	tr := parseTrackerResponse(string(robots))
-	t.tracker_response = tr
 	fmt.Printf("Tracker Response: %s\n\n", string(robots))
+	return tr
 }
 
-func (t *TrackerGetRequest) GetPeers() []torrentPeer {
-	t.MakeTrackerRequest()
-	return t.tracker_response.peers
+func (t *TrackerProxy) GetPeers() []torrentPeer {
+	t.response = t.tgr.MakeTrackerRequest()
+	return t.response.peers
 }
 
 func parsePeersDictionary(m []bItem) []torrentPeer {
@@ -123,8 +145,8 @@ func parsePeersString(s string) []torrentPeer {
 	return out
 }
 
-func parseTrackerResponse(s string) *TrackerResponse {
-	tr := new(TrackerResponse)
+func parseTrackerResponse(s string) *trackerResponse {
+	tr := new(trackerResponse)
 	bi, _ := Bdecode([]byte(s))
 	b := bi.d
 	tr.complete = int(b["complete"].i)
