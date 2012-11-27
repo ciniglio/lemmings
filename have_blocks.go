@@ -184,7 +184,6 @@ func (p *Pieces) checkPiece(i int) {
 			p.pieces[i].data = nil
 			p.pieces[i].blocks = nil
 			p.pieces[i].blocks_requested = nil
-			panic("HUHU")
 			return
 		}
 	}
