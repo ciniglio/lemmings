@@ -71,6 +71,7 @@ func Bdecode(p []byte) (*bItem, int) {
 		var i *bItem
 		for {
 			i, q = Bdecode(p[start:])
+			start += q
 			if i == nil {
 				return nil, -1
 			}
@@ -79,7 +80,6 @@ func Bdecode(p []byte) (*bItem, int) {
 				break
 			}
 			bi.l = append(bi.l, *i)
-			start += q
 		}
 		progress = start
 	case 'd':
@@ -88,22 +88,22 @@ func Bdecode(p []byte) (*bItem, int) {
 		start := 1
 		for {
 			i, q := Bdecode(p[start:])
+			start += q
 			if i == nil {
 				return nil, -1
 			}
 			if q == 1 {
 				break
 			}
-			start += q
 			j, r := Bdecode(p[start:])
+			start += r
 			if j == nil {
 				return nil, -1
 			}
 			// dict[i.string] = j
 			bi.d[i.s] = *j
-			start += r
 		}
-		progress = start + 1
+		progress = start
 	default:
 		// String
 		end = bytes.IndexByte(p[0:], ':')

@@ -246,7 +246,6 @@ func (peer *Peer) handleHave(m HaveMessage) {
 func (p *Peer) readerRoutine() {
 	var buffer []byte
 	for {
-		//fmt.Println("Reader Routine", time.Now())
 		bufsize := 1024
 		data := make([]byte, bufsize)
 		n, err := p.connection.Read(data)
@@ -258,7 +257,6 @@ func (p *Peer) readerRoutine() {
 		}
 
 		if n > 0 {
-			fmt.Printf("Read %d bytes @ %v\n", n, time.Now())
 			buffer = append(buffer, data[0:n]...)
 		}
 		if len(buffer) < 4 {

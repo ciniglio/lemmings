@@ -28,6 +28,7 @@ func NewFileWriter(t *TorrentInfo, tf string) *FileWriter {
 }
 
 func (fw *FileWriter) Run() {
+	var perm os.FileMode = 0731
 	files := make([]filePath, 0)
 
 	root := path.Dir(fw.torrent_file)
@@ -38,36 +39,43 @@ func (fw *FileWriter) Run() {
 	}
 	err := os.Chdir(root)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Chdir root", err)
 		// handle this somehow
 	}
 	if fw.torrent.numfiles > 1 {
 		root = path.Join(root, fw.torrent.name)
-		err = os.MkdirAll(root, os.ModeDir)
+		err = os.MkdirAll(root, os.ModeDir | perm)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Mkdir multifile", err)
 			// handle this too
 		}
 
 	} else {
 		root = path.Join(root, path.Dir(fw.torrent.name))
-		err = os.MkdirAll(root, os.ModeDir)
+		err = os.MkdirAll(root, os.ModeDir | perm)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Mkdir 1 file", err)
 		}
 	}
 	os.Chdir(root)
 	for _, f := range fw.torrent.files {
-		dir := path.Dir(f.path)
-		err = os.MkdirAll(dir, os.ModeDir)
-		if err != nil {
-			fmt.Println(err)
-			// handle
+		for i, d := range f.path {
+			if i == len(f.path) - 1{
+				break
+			}
+			err = os.MkdirAll(d, os.ModeDir | perm)
+			if err != nil {
+				fmt.Println("Create Dir", err)
+				// handle
+			}
+			os.Chdir(d)
 		}
-		os.Chdir(dir)
-		fi, err := os.Create(path.Base(f.path))
+
+		dir, _ := os.Getwd()
+		file_name := f.path[len(f.path)-1]
+		fi, err := os.Create(file_name)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Create file", err, f)
 		}
 		fp := filePath{dir, fi}
 		files = append(files, fp)

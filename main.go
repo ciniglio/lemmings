@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	torrent_file := "test/test.torrent"
+	torrent_file := "test/test1.torrent"
 	c := make(chan Message, 10)
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {

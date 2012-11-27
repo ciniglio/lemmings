@@ -119,7 +119,8 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	}
 
 	// get random piece index and set up for requesting
-	ind := indices[0] //indices[RandomInt(len(indices))]
+	//ind := indices[0] 
+	ind := indices[RandomInt(len(indices))]
 	if ours.pieces[ind].blocks == nil {
 		ours.initBlocksAtPiece(ind)
 	}
@@ -137,7 +138,8 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	}
 
 	// otherwise return random block offset too.
-	off := indices[0] //indices[RandomInt(len(indices))]
+	//off := indices[0] 
+	off := indices[RandomInt(len(indices))]
 
 	return ind, off
 }

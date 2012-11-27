@@ -3,11 +3,12 @@ package tracker
 import (
 	"crypto/sha1"
 	"io/ioutil"
+	"fmt"
 )
 
 type torrentFile struct {
 	length int64  //size of file in bytes
-	path   string //filename
+	path   []string //filename
 }
 
 type TorrentInfo struct {
@@ -40,6 +41,7 @@ func (t *TorrentInfo) add_info_hash(info bItem) {
 	h := sha1.New()
 	h.Write(info.raw)
 	t.info_hash = string(h.Sum(nil))
+	fmt.Printf("infoHash: %+s\n", info.raw)
 }
 
 func (t *TorrentInfo) generate_client_id() {
@@ -69,7 +71,7 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 	if info["length"].i > 0 {
 		f := new(torrentFile)
 		f.length = info["length"].i
-		f.path = t.name
+		f.path = []string{t.name}
 		t.files = append(t.files, *f)
 		t.numfiles = 1
 		t.total_length += f.length
@@ -78,7 +80,11 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 		for _, v := range info["files"].l {
 			f := new(torrentFile)
 			f.length = v.d["length"].i
-			f.path = v.d["path"].s
+			paths := make([]string, 0)
+			for _, t := range v.d["path"].l {
+				paths = append(paths, t.s)
+			}
+			f.path = paths
 			t.files = append(t.files, *f)
 			t.numfiles++
 			t.total_length += f.length
