@@ -1,8 +1,8 @@
 package tracker
 
 import (
-	"fmt"
 	"crypto/sha1"
+	"fmt"
 )
 
 type piece struct {
@@ -18,6 +18,7 @@ type Pieces struct {
 	piece_length int
 	total_length int
 	hashes       []string
+	client_chan  chan Message
 }
 
 func (p *Pieces) Length() int {
@@ -51,7 +52,9 @@ func (p *Pieces) blockSize(i, o int) int {
 func (p *Pieces) numBlocks(i int) int {
 	rem := p.pieceSize(i) % int(block_size)
 	num := p.pieceSize(i) / int(block_size)
-	if rem > 0 { num++ }
+	if rem > 0 {
+		num++
+	}
 	return num
 }
 
@@ -188,6 +191,8 @@ func (p *Pieces) checkPiece(i int) {
 		}
 	}
 
+	p.client_chan <- InternalWriteBlockMessage{p.pieces[i].data, i}
+
 	p.pieces[i].have = true
 	p.pieces[i].requested = false
 }
@@ -198,5 +203,6 @@ func CreateNewPieces(num_pieces int, t *TorrentInfo) *Pieces {
 	pieces.total_length = int(t.total_length)
 	pieces.hashes = t.pieces
 	pieces.pieces = make([]piece, num_pieces)
+	pieces.client_chan = t.client_chan
 	return pieces
 }

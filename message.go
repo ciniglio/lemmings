@@ -20,6 +20,7 @@ const (
 	i_sent_request
 	i_get_peers
 	i_recv_block
+	i_write_block
 )
 
 type Message interface {
@@ -167,3 +168,10 @@ type InternalReceivedBlockMessage struct {
 }
 
 func (c InternalReceivedBlockMessage) kind() kind { return i_recv_block }
+
+type InternalWriteBlockMessage struct {
+	bytes []byte
+	index int
+}
+
+func (c InternalWriteBlockMessage) kind() kind { return i_write_block }

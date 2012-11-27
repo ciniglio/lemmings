@@ -22,14 +22,18 @@ type TorrentInfo struct {
 	client_id    string        // randomly generated 20 bytes
 	our_pieces   *Pieces
 	total_length int64
+	client_chan  chan Message
 }
 
-func ReadTorrentFile(path string) (*TorrentInfo, error) {
+func ReadTorrentFile(path string, c chan Message) (*TorrentInfo, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ParseTorrentInfo(b), nil
+	t := ParseTorrentInfo(b)
+	t.client_chan = c
+	t.our_pieces = CreateNewPieces(t.numpieces, t)
+	return t, nil
 }
 
 func (t *TorrentInfo) add_info_hash(info bItem) {
@@ -80,8 +84,6 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 			t.total_length += f.length
 		}
 	}
-
-	t.our_pieces = CreateNewPieces(t.numpieces, t)
 
 	return t
 }

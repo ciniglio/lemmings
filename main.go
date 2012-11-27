@@ -5,7 +5,9 @@ import (
 )
 
 func main() {
-	torrent, err := ReadTorrentFile("test/test.torrent")
+	torrent_file := "test/test.torrent"
+	c := make(chan Message, 10)
+	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
@@ -15,7 +17,8 @@ func main() {
 	get_peers := InternalGetPeersMessage{ret: msg}
 	tracker_proxy.msg <- get_peers
 
-	c := make(chan Message)
+	fw := NewFileWriter(torrent, torrent_file)
+	go fw.Run()
 
 	peers := make([]Peer, 0)
 
@@ -45,7 +48,9 @@ func main() {
 			for i := range peers {
 				peers[i].messageChannel <- InternalReceivedBlockMessage{index: msg.index, begin: msg.begin}
 			}
-
+		case i_write_block:
+			fmt.Println("About to write")
+			fw.messages <- m
 		default:
 			fmt.Println("Got weird internal request")
 		}
