@@ -27,6 +27,28 @@ func (p *Pieces) HaveAtIndex(i int) bool {
 	return p.pieces[i].have
 }
 
+func (p *Pieces) pieceSize(i int) int {
+	length := p.piece_length
+	if i == p.Length()-1 {
+		fmt.Println("!!!LAST PIECE")
+		length = int(p.total_length % p.piece_length)
+		fmt.Println("Mod: ", p.total_length, p.piece_length)
+	}
+	return length
+}
+
+func (p *Pieces) blockSize(i, o int) int {
+	length := int(block_size)
+	if i == p.Length()-1 {
+		rem := int(p.total_length % p.piece_length)
+		last_ind := int(rem / int(block_size))
+		if o == last_ind {
+			length = int(p.total_length % int(block_size))
+		}
+	}
+	return length
+}
+
 func (p *Pieces) setAtIndex(i int, b bool) {
 	p.pieces[i].have = b
 }
@@ -145,7 +167,11 @@ func (p *Pieces) checkPiece(i int) {
 	}
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
-	if i == 106 { fmt.Printf("Piece: %+X\n", p.pieces[i].data) }
+	if i == 106 {
+		fmt.Println("PieceSize: ", p.pieceSize(i))
+		fmt.Printf("Piece: %+X\n", p.pieces[i].data[0:p.pieceSize(i)])
+	}
+
 	p.pieces[i].have = true
 	p.pieces[i].requested = false
 }

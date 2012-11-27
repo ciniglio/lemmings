@@ -60,8 +60,6 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 
 	t.numpieces = len(t.pieces)
 
-	t.our_pieces = CreateNewPieces(t.numpieces, t)
-
 	t.total_length = 0
 
 	if info["length"].i > 0 {
@@ -82,6 +80,8 @@ func ParseTorrentInfo(b []byte) *TorrentInfo {
 			t.total_length += f.length
 		}
 	}
+
+	t.our_pieces = CreateNewPieces(t.numpieces, t)
 
 	return t
 }

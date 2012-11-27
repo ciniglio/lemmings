@@ -167,17 +167,7 @@ func (p *Peer) SendRequest(index, begin int) {
 		m := RequestMessage{}
 		m.index = index
 		m.begin = begin
-		length := block_size
-
-		if index == p.their_pieces.Length()-1 {
-			rem := p.torrent_info.total_length % p.torrent_info.pieceLength
-			last_ind := int(rem / block_size)
-			if begin == last_ind {
-				length = p.torrent_info.total_length % block_size
-				fmt.Println("Last block, length: ", length)
-			}
-		}
-		m.length = int(length)
+		m.length = p.their_pieces.blockSize(index, begin)
 		p.outstanding_request_count += 1
 		p.Send(m.bytes())
 		fmt.Println("Sending request")
@@ -195,17 +185,7 @@ func (p *Peer) sendCancel(m InternalReceivedBlockMessage) {
 			msg.index = m.index
 			msg.begin = m.begin
 
-			length := block_size
-
-			if m.index == p.their_pieces.Length()-1 {
-				rem := p.torrent_info.total_length % p.torrent_info.pieceLength
-				last_ind := int(rem / block_size)
-				if m.begin == last_ind {
-					length = p.torrent_info.total_length % block_size
-					fmt.Println("Last block, length: ", length)
-				}
-			}
-			msg.length = int(length)
+			msg.length = p.their_pieces.blockSize(m.index, m.begin)
 			p.outstanding_request_count -= 1
 			p.Send(msg.bytes())
 		}
