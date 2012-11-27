@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"crypto/sha1"
 )
 
 type piece struct {
@@ -30,9 +31,7 @@ func (p *Pieces) HaveAtIndex(i int) bool {
 func (p *Pieces) pieceSize(i int) int {
 	length := p.piece_length
 	if i == p.Length()-1 {
-		fmt.Println("!!!LAST PIECE")
 		length = int(p.total_length % p.piece_length)
-		fmt.Println("Mod: ", p.total_length, p.piece_length)
 	}
 	return length
 }
@@ -49,15 +48,22 @@ func (p *Pieces) blockSize(i, o int) int {
 	return length
 }
 
+func (p *Pieces) numBlocks(i int) int {
+	rem := p.pieceSize(i) % int(block_size)
+	num := p.pieceSize(i) / int(block_size)
+	if rem > 0 { num++ }
+	return num
+}
+
 func (p *Pieces) setAtIndex(i int, b bool) {
 	p.pieces[i].have = b
 }
 
 func (p *Pieces) initBlocksAtPiece(i int) {
-	size := p.piece_length / 16384
+	size := p.numBlocks(i)
 	p.pieces[i].blocks = make([]bool, size)
 	p.pieces[i].blocks_requested = make([]bool, size)
-	p.pieces[i].data = make([]byte, p.piece_length)
+	p.pieces[i].data = make([]byte, p.pieceSize(i))
 }
 
 func (p *Pieces) lengthBlocksInPiece(i int) int {
@@ -167,9 +173,20 @@ func (p *Pieces) checkPiece(i int) {
 	}
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
-	if i == 106 {
-		fmt.Println("PieceSize: ", p.pieceSize(i))
-		fmt.Printf("Piece: %+X\n", p.pieces[i].data[0:p.pieceSize(i)])
+
+	h := sha1.New()
+	h.Write(p.pieces[i].data[0:p.pieceSize(i)])
+	hash := string(h.Sum(nil))
+
+	for j := range hash {
+		if hash[j] != p.hashes[i][j] {
+			p.pieces[i].requested = false
+			p.pieces[i].data = nil
+			p.pieces[i].blocks = nil
+			p.pieces[i].blocks_requested = nil
+			panic("HUHU")
+			return
+		}
 	}
 
 	p.pieces[i].have = true
