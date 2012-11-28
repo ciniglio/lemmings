@@ -291,13 +291,13 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	if size > len(buffer) {
 		return nil, 0
 	}
-	if size > 0 {
+	if size > 4 {
 		id = toInt(buffer[4:5])
 	}
 
 	curpos := size
 	switch {
-	case size == 0:
+	case size == 4:
 		//do nothing
 	default:
 		fmt.Println("Parsing Message, ID: ", id)
