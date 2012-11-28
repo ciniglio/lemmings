@@ -103,7 +103,7 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 		if !p.have && p.requested && theirs.pieces[i].have {
 			for j, b := range p.blocks {
 				if !b && !p.blocks_requested[j] {
-					return i, (j*int(block_size))
+					return i, (j * int(block_size))
 				}
 			}
 		}
@@ -141,7 +141,7 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	//off := indices[0] 
 	off := indices[RandomInt(len(indices))]
 	ours.RequestedPieceAndOffset(ind, off*int(block_size))
-	return ind, (off*int(block_size))
+	return ind, (off * int(block_size))
 }
 
 func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {

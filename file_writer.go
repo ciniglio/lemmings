@@ -44,7 +44,7 @@ func (fw *FileWriter) Run() {
 	}
 	if fw.torrent.numfiles > 1 {
 		root = path.Join(root, fw.torrent.name)
-		err = os.MkdirAll(root, os.ModeDir | perm)
+		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
 			fmt.Println("Mkdir multifile", err)
 			// handle this too
@@ -52,7 +52,7 @@ func (fw *FileWriter) Run() {
 
 	} else {
 		root = path.Join(root, path.Dir(fw.torrent.name))
-		err = os.MkdirAll(root, os.ModeDir | perm)
+		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
 			fmt.Println("Mkdir 1 file", err)
 		}
@@ -60,10 +60,10 @@ func (fw *FileWriter) Run() {
 	os.Chdir(root)
 	for _, f := range fw.torrent.files {
 		for i, d := range f.path {
-			if i == len(f.path) - 1{
+			if i == len(f.path)-1 {
 				break
 			}
-			err = os.MkdirAll(d, os.ModeDir | perm)
+			err = os.MkdirAll(d, os.ModeDir|perm)
 			if err != nil {
 				fmt.Println("Create Dir", err)
 				// handle

@@ -79,7 +79,6 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 	peer.torrent_peer = p
 	fmt.Println("Peer in CreatePeer", p)
 
-	
 	peer.connection_info = InitialConnectionInfo()
 	peer.their_pieces = CreateNewPieces(t.numpieces, t)
 	peer.messageChannel = make(chan Message, 10) // magic number
@@ -90,7 +89,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 func (peer *Peer) runPeer() {
 	if !peer.connect() {
 		fmt.Println("Connection problem")
-		return 
+		return
 	}
 	peer.initiateHandshake()
 	go peer.readerRoutine()
@@ -192,8 +191,8 @@ func (p *Peer) sendCancel(m InternalReceivedBlockMessage) {
 
 func (p *Peer) act() {
 	switch {
-		//case p.connection_info.am_interested && p.connection_info.peer_choking:
-		//p.Send(UnchokeMessage{}.bytes())
+	//case p.connection_info.am_interested && p.connection_info.peer_choking:
+	//p.Send(UnchokeMessage{}.bytes())
 	default:
 		n, b := p.GetIndexAndBeginForRequest()
 		if n >= 0 && b >= 0 {
@@ -264,7 +263,7 @@ func (p *Peer) readerRoutine() {
 		p.parseHandshakeMessage(&buffer)
 
 		for msg, curpos := parseBytesToMessage(buffer); msg != nil; {
-			
+
 			buffer = buffer[curpos:]
 			if msg != nil {
 				p.messageChannel <- msg

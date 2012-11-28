@@ -28,30 +28,32 @@ func main() {
 			go peer.runPeer()
 		}
 	}
-
-	for m := range c {
-		switch m.kind() {
-		case i_get_request:
-			msg := m.(*InternalGetRequestMessage)
-			i, b := torrent.our_pieces.GetPieceAndOffsetForRequest(msg.pieces)
-			msg.ret <- i
-			msg.ret <- b
-		case i_sent_request:
-			msg := m.(*InternalSendingRequestMessage)
-			i := msg.index
-			b := msg.begin
-			torrent.our_pieces.RequestedPieceAndOffset(i, b)
-		case piece_t:
-			msg := m.(PieceMessage)
-			torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
-		case i_write_block:
-			fmt.Println("About to write")
-			fw.messages <- m
-		case i_subscribe: 
-			msg := m.(*InternalSubscribeMessage)
-			peers = append(peers, msg.c)
-		default:
-			fmt.Println("Got weird internal request")
+	for {
+		select {
+		case m := <-c:
+			switch m.kind() {
+			case i_get_request:
+				msg := m.(*InternalGetRequestMessage)
+				i, b := torrent.our_pieces.GetPieceAndOffsetForRequest(msg.pieces)
+				msg.ret <- i
+				msg.ret <- b
+			case i_sent_request:
+				msg := m.(*InternalSendingRequestMessage)
+				i := msg.index
+				b := msg.begin
+				torrent.our_pieces.RequestedPieceAndOffset(i, b)
+			case piece_t:
+				msg := m.(PieceMessage)
+				torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
+			case i_write_block:
+				fmt.Println("About to write")
+				fw.messages <- m
+			case i_subscribe:
+				msg := m.(*InternalSubscribeMessage)
+				peers = append(peers, msg.c)
+			default:
+				fmt.Println("Got weird internal request")
+			}
 		}
 	}
 }
