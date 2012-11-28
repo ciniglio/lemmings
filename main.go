@@ -6,7 +6,7 @@ import (
 
 func main() {
 	torrent_file := "test/test2.torrent"
-	c := make(chan Message, 10)
+	c := make(chan Message, 1000)
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -20,12 +20,11 @@ func main() {
 	fw := NewFileWriter(torrent, torrent_file)
 	go fw.Run()
 
-	peers := make([]Peer, 0)
+	peers := make([]chan Message, 0)
 
 	for p := range msg {
 		peer := CreatePeer(p, torrent, c)
 		if peer != nil {
-			peers = append(peers, *peer)
 			go peer.runPeer()
 		}
 	}
@@ -45,12 +44,12 @@ func main() {
 		case piece_t:
 			msg := m.(PieceMessage)
 			torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
-			for _ = range peers {
-				//peers[i].messageChannel <- InternalReceivedBlockMessage{index: msg.index, begin: msg.begin}
-			}
 		case i_write_block:
 			fmt.Println("About to write")
 			fw.messages <- m
+		case i_subscribe: 
+			msg := m.(*InternalSubscribeMessage)
+			peers = append(peers, msg.c)
 		default:
 			fmt.Println("Got weird internal request")
 		}

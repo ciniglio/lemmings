@@ -127,9 +127,6 @@ func (peer *Peer) runPeer() {
 				fmt.Println("Piece")
 				// talk to client
 				peer.handlePiece(msg.(PieceMessage))
-				//case client_have: 
-				// client tells me we just recvd piece
-				// I send haves and cancels
 			case i_recv_block:
 				fmt.Println("Other peer recieved block")
 				peer.sendCancel(msg.(InternalReceivedBlockMessage))
@@ -172,7 +169,6 @@ func (p *Peer) SendRequest(index, begin int) {
 		m.length = p.their_pieces.blockSize(index, begin/int(block_size))
 		p.outstanding_request_count += 1
 		p.Send(m.bytes())
-		fmt.Println("Sending request", index, begin)
 		n := new(InternalSendingRequestMessage)
 		n.index = index
 		n.begin = begin

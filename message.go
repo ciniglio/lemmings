@@ -21,6 +21,7 @@ const (
 	i_get_peers
 	i_recv_block
 	i_write_block
+	i_subscribe
 )
 
 type Message interface {
@@ -175,3 +176,9 @@ type InternalWriteBlockMessage struct {
 }
 
 func (c InternalWriteBlockMessage) kind() kind { return i_write_block }
+
+type InternalSubscribeMessage struct {
+	c chan Message
+}
+
+func (c InternalSubscribeMessage) kind() kind { return i_subscribe }

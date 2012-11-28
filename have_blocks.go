@@ -140,7 +140,7 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	// otherwise return random block offset too.
 	//off := indices[0] 
 	off := indices[RandomInt(len(indices))]
-
+	ours.RequestedPieceAndOffset(ind, off*int(block_size))
 	return ind, (off*int(block_size))
 }
 
@@ -198,7 +198,7 @@ func (p *Pieces) checkPiece(i int) {
 			return
 		}
 	}
-
+	fmt.Println("Going to add to client_chan", len(p.client_chan))
 	p.client_chan <- InternalWriteBlockMessage{p.pieces[i].data, i}
 
 	p.pieces[i].have = true
