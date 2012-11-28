@@ -70,7 +70,7 @@ func (p *Pieces) initBlocksAtPiece(i int) {
 }
 
 func (p *Pieces) lengthBlocksInPiece(i int) int {
-	return len(p.pieces[i].blocks)
+	return p.numBlocks(i)
 }
 
 func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
@@ -78,7 +78,7 @@ func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
 	if p.pieces[piece].blocks == nil {
 		p.initBlocksAtPiece(piece)
 	}
-	p.pieces[piece].blocks_requested[offset] = true
+	p.pieces[piece].blocks_requested[offset/int(block_size)] = true
 }
 
 func (p *Pieces) requested(index, begin int) bool {
@@ -103,7 +103,7 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 		if !p.have && p.requested && theirs.pieces[i].have {
 			for j, b := range p.blocks {
 				if !b && !p.blocks_requested[j] {
-					return i, j
+					return i, (j*int(block_size))
 				}
 			}
 		}
@@ -141,18 +141,21 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	//off := indices[0] 
 	off := indices[RandomInt(len(indices))]
 
-	return ind, off
+	return ind, (off*int(block_size))
 }
 
 func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
 	if i >= p.Length() || offset >= p.lengthBlocksInPiece(i) {
 		return false
 	}
-	return p.pieces[i].blocks[offset]
+	return p.pieces[i].blocks[offset/int(block_size)]
 }
 
 func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
-	if i >= p.Length() || offset >= p.lengthBlocksInPiece(i) {
+	if p.pieces[i].blocks == nil {
+		p.initBlocksAtPiece(i)
+	}
+	if i >= p.Length() || (offset/int(block_size)) >= p.lengthBlocksInPiece(i) {
 		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
 		fmt.Printf("Compare to index: %d\n", p.Length())
 
@@ -162,11 +165,11 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 		fmt.Printf("Got a bad block")
 		return
 	}
-	p.pieces[i].blocks[offset] = true
+	p.pieces[i].blocks[offset/int(block_size)] = true
 	for j, by := range b {
 		p.pieces[i].data[offset+j] = by
 	}
-	p.pieces[i].blocks_requested[offset] = false
+	p.pieces[i].blocks_requested[offset/int(block_size)] = false
 	p.checkPiece(i)
 }
 
@@ -176,6 +179,8 @@ func (p *Pieces) checkPiece(i int) {
 			return
 		}
 	}
+	fmt.Println("Blocks: ", p.pieces[i].blocks)
+
 	fmt.Println("Finished a block ", i)
 	fmt.Println(p)
 
@@ -189,6 +194,7 @@ func (p *Pieces) checkPiece(i int) {
 			p.pieces[i].data = nil
 			p.pieces[i].blocks = nil
 			p.pieces[i].blocks_requested = nil
+			fmt.Println("Bad Hash")
 			return
 		}
 	}

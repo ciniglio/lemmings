@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	torrent_file := "test/test1.torrent"
+	torrent_file := "test/test2.torrent"
 	c := make(chan Message, 10)
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
@@ -45,8 +45,8 @@ func main() {
 		case piece_t:
 			msg := m.(PieceMessage)
 			torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
-			for i := range peers {
-				peers[i].messageChannel <- InternalReceivedBlockMessage{index: msg.index, begin: msg.begin}
+			for _ = range peers {
+				//peers[i].messageChannel <- InternalReceivedBlockMessage{index: msg.index, begin: msg.begin}
 			}
 		case i_write_block:
 			fmt.Println("About to write")

@@ -3,7 +3,6 @@ package tracker
 import (
 	"crypto/sha1"
 	"io/ioutil"
-	"fmt"
 )
 
 type torrentFile struct {
@@ -41,7 +40,6 @@ func (t *TorrentInfo) add_info_hash(info bItem) {
 	h := sha1.New()
 	h.Write(info.raw)
 	t.info_hash = string(h.Sum(nil))
-	fmt.Printf("infoHash: %+s\n", info.raw)
 }
 
 func (t *TorrentInfo) generate_client_id() {

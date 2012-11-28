@@ -79,10 +79,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 	peer.torrent_peer = p
 	fmt.Println("Peer in CreatePeer", p)
 
-	if !peer.connect() {
-		fmt.Println("Connection problem")
-		return nil
-	}
+	
 	peer.connection_info = InitialConnectionInfo()
 	peer.their_pieces = CreateNewPieces(t.numpieces, t)
 	peer.messageChannel = make(chan Message, 10) // magic number
@@ -91,6 +88,10 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 }
 
 func (peer *Peer) runPeer() {
+	if !peer.connect() {
+		fmt.Println("Connection problem")
+		return 
+	}
 	peer.initiateHandshake()
 	go peer.readerRoutine()
 	fmt.Println("Sent Handshake")
@@ -98,6 +99,7 @@ func (peer *Peer) runPeer() {
 		runtime.Gosched()
 		select {
 		case msg := <-peer.messageChannel:
+			fmt.Println("Recvd Message: ", peer)
 			switch msg.kind() {
 			case choke:
 				fmt.Println("Choked")
@@ -167,10 +169,10 @@ func (p *Peer) SendRequest(index, begin int) {
 		m := RequestMessage{}
 		m.index = index
 		m.begin = begin
-		m.length = p.their_pieces.blockSize(index, begin)
+		m.length = p.their_pieces.blockSize(index, begin/int(block_size))
 		p.outstanding_request_count += 1
 		p.Send(m.bytes())
-		fmt.Println("Sending request")
+		fmt.Println("Sending request", index, begin)
 		n := new(InternalSendingRequestMessage)
 		n.index = index
 		n.begin = begin
@@ -194,13 +196,13 @@ func (p *Peer) sendCancel(m InternalReceivedBlockMessage) {
 
 func (p *Peer) act() {
 	switch {
-	case p.connection_info.am_interested && p.connection_info.peer_choking:
+		//case p.connection_info.am_interested && p.connection_info.peer_choking:
 		//p.Send(UnchokeMessage{}.bytes())
 	default:
 		n, b := p.GetIndexAndBeginForRequest()
 		if n >= 0 && b >= 0 {
 			switch {
-			case !p.connection_info.am_interested:
+			case !p.connection_info.am_interested: // || p.connection_info.peer_choking:
 				p.connection_info.am_interested = true
 				fmt.Println("Sending Interested")
 				p.Send(InterestedMessage{}.bytes())
@@ -266,10 +268,12 @@ func (p *Peer) readerRoutine() {
 		p.parseHandshakeMessage(&buffer)
 
 		for msg, curpos := parseBytesToMessage(buffer); msg != nil; {
+			
 			buffer = buffer[curpos:]
 			if msg != nil {
 				p.messageChannel <- msg
 			}
+			fmt.Println("Adding to message queue; unread: ", len(p.messageChannel))
 			msg, curpos = parseBytesToMessage(buffer)
 		}
 	}
@@ -283,12 +287,14 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	var msg Message
 	size := 4 + toInt(buffer[:4])
 	id := 0
-	if size > 0 {
-		id = toInt(buffer[4:5])
-	}
+
 	if size > len(buffer) {
 		return nil, 0
 	}
+	if size > 0 {
+		id = toInt(buffer[4:5])
+	}
+
 	curpos := size
 	switch {
 	case size == 0:
