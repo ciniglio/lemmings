@@ -16,7 +16,7 @@ type FileWriter struct {
 
 type filePath struct {
 	dir string
-	f   *os.File
+	f   string
 }
 
 func NewFileWriter(t *TorrentInfo, tf string) *FileWriter {
@@ -29,24 +29,23 @@ func NewFileWriter(t *TorrentInfo, tf string) *FileWriter {
 
 func (fw *FileWriter) Run() {
 	var perm os.FileMode = 0731
+	var err error
 	files := make([]filePath, 0)
 
 	root := path.Dir(fw.torrent_file)
 
 	if !path.IsAbs(root) {
-		cwd, _ := os.Getwd()
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Println("Error getting wd 0: ", err)
+		}
 		root = path.Join(cwd, root)
-	}
-	err := os.Chdir(root)
-	if err != nil {
-		fmt.Println("Chdir root", err)
-		// handle this somehow
 	}
 	if fw.torrent.numfiles > 1 {
 		root = path.Join(root, fw.torrent.name)
 		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
-			fmt.Println("Mkdir multifile", err)
+			fmt.Println("Error Mkdir multifile", err)
 			// handle this too
 		}
 
@@ -54,38 +53,41 @@ func (fw *FileWriter) Run() {
 		root = path.Join(root, path.Dir(fw.torrent.name))
 		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
-			fmt.Println("Mkdir 1 file", err)
+			fmt.Println("Error Mkdir 1 file", err)
 		}
 	}
-	os.Chdir(root)
+	if err != nil {
+		fmt.Println("Error Chdir root", err)
+		// handle this somehow
+	}
 	for _, f := range fw.torrent.files {
+		dir := root
 		for i, d := range f.path {
 			if i == len(f.path)-1 {
 				break
 			}
-			err = os.MkdirAll(d, os.ModeDir|perm)
+			dir = path.Join(dir, d)
+			err = os.MkdirAll(dir, os.ModeDir|perm)
 			if err != nil {
-				fmt.Println("Create Dir", err)
+				fmt.Println("Error Create Dir", err)
 				// handle
 			}
-			os.Chdir(d)
 		}
 
-		dir, _ := os.Getwd()
+
 		file_name := f.path[len(f.path)-1]
-		fi, err := os.Create(file_name)
+		fi, err := os.Create(path.Join(dir,file_name))
 		if err != nil {
-			fmt.Println("Create file", err, f)
+			fmt.Println("Error Create file", err, f)
 		}
-		fp := filePath{dir, fi}
+		fmt.Println("DIR:::", dir)
+		fp := filePath{dir, file_name}
 		files = append(files, fp)
 
-		b := make([]byte, f.length)
-		_, err = fi.WriteAt(b, 0)
+		fi.Close()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error Chdir root", err)
 		}
-		os.Chdir(root)
 	}
 
 	fw.files = files
@@ -101,16 +103,17 @@ func (fw *FileWriter) Run() {
 }
 
 func (fw *FileWriter) write(b []byte, index int) {
+	var perm os.FileMode = 0666
 	offset := int64(index) * fw.torrent.pieceLength
 	remaining := len(b)
 	next_byte := 0
 	cur := int64(0)
 	prev := int64(0)
-	os.Chdir(fw.root)
 	for i, f := range fw.torrent.files {
 		if remaining <= 0 {
 			break
 		}
+		
 		cur += f.length
 		if offset < cur {
 			file_offset := offset - prev
@@ -120,13 +123,16 @@ func (fw *FileWriter) write(b []byte, index int) {
 			} else {
 				to_write = next_byte + int(f.length-file_offset)
 			}
-			os.Chdir(fw.files[i].dir)
-			fw.files[i].f.WriteAt(b[next_byte:to_write], file_offset)
+			fi, err := os.OpenFile(path.Join(fw.files[i].dir, fw.files[i].f), os.O_RDWR, perm)
+			if err != nil {
+				fmt.Println("Error opening: ", err, fw.files[i])
+			}
+			fi.WriteAt(b[next_byte:to_write], file_offset)
+			fi.Close()
 			remaining -= to_write - next_byte
 			next_byte += to_write
 			offset += int64(to_write)
 		}
 		prev += f.length
-		os.Chdir(fw.root)
 	}
 }
