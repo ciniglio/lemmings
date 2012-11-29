@@ -95,6 +95,34 @@ func (p *Pieces) String() string {
 	}
 	return string(s)
 }
+
+func (ours *Pieces) GetBlockAtPieceAndOffset(i, o, l int) []byte {
+	if !ours.pieces[i].have {
+		return nil
+	}
+
+	return ours.pieces[i].data[o : o+l]
+}
+
+func (ours *Pieces) CreateBitField() (b []byte) {
+	b = make([]byte, 0)
+	var i uint
+	for i = 0; i < uint(len(ours.pieces)); i += 8 {
+		by := byte(0)
+		var j uint
+		for j = 0; j < 8; j++ {
+			if i+j >= uint(len(ours.pieces)) {
+				break
+			}
+			if ours.pieces[i+j].have {
+				by = by | (1 << (7 - j))
+			}
+		}
+		b = append(b, by)
+	}
+	return b
+}
+
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {

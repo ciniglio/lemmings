@@ -22,6 +22,8 @@ const (
 	i_recv_block
 	i_write_block
 	i_subscribe
+	i_request
+	i_have
 )
 
 type Message interface {
@@ -75,8 +77,8 @@ type HaveMessage struct {
 
 func (c HaveMessage) kind() kind { return have }
 
-func (m HaveMessage) bytes() []byte {
-	b := make([]byte, 0)
+func (m HaveMessage) bytes() (b []byte) {
+	b = make([]byte, 0)
 	b = append(b, to4Bytes(uint32(5))...)
 	b = append(b, byte(have))
 	b = append(b, to4Bytes(uint32(m.index))...)
@@ -88,6 +90,10 @@ type BitFieldMessage struct {
 }
 
 func (c BitFieldMessage) kind() kind { return bitfield }
+
+func (c BitFieldMessage) bytes() []byte {
+	return c.bitfield
+}
 
 type RequestMessage struct {
 	index  int
@@ -182,3 +188,16 @@ type InternalSubscribeMessage struct {
 }
 
 func (c InternalSubscribeMessage) kind() kind { return i_subscribe }
+
+type InternalRequestMessage struct {
+	m   RequestMessage
+	ret chan *PieceMessage
+}
+
+func (c InternalRequestMessage) kind() kind { return i_request }
+
+type InternalHaveMessage struct {
+	index int
+}
+
+func (c InternalHaveMessage) kind() kind { return i_have }

@@ -70,6 +70,8 @@ func (peer *Peer) connect() bool {
 	}
 	peer.connection.SetKeepAlive(true)
 
+	peer.clientChannel <- InternalSubscribeMessage{peer.messageChannel}
+
 	return true
 }
 
@@ -129,6 +131,9 @@ func (peer *Peer) runPeer() {
 			case i_recv_block:
 				fmt.Println("Other peer recieved block")
 				peer.sendCancel(msg.(InternalReceivedBlockMessage))
+			case i_have:
+				fmt.Println("Recieved Broadcast")
+				peer.Send(HaveMessage(msg.(InternalHaveMessage)).bytes())
 			default:
 				fmt.Println("Something weird")
 			}
@@ -141,11 +146,13 @@ func (peer *Peer) runPeer() {
 func (p *Peer) Send(b []byte) {
 	n := 0
 	var err error
+	fmt.Println("trying to send:", b)
 	for n < len(b) {
 		b = b[n:]
 		n, err = p.connection.Write(b)
 		if err != nil {
 			fmt.Println("Send error", err)
+			return
 		}
 	}
 }
@@ -171,6 +178,7 @@ func (p *Peer) SendRequest(index, begin int) {
 		n := new(InternalSendingRequestMessage)
 		n.index = index
 		n.begin = begin
+		fmt.Println("Adding sent request to clientchan", len(p.clientChannel))
 		p.clientChannel <- n
 	}
 }
@@ -201,6 +209,7 @@ func (p *Peer) act() {
 				p.connection_info.am_interested = true
 				fmt.Println("Sending Interested")
 				p.Send(InterestedMessage{}.bytes())
+				p.SendRequest(n, b)
 			case !p.connection_info.peer_choking:
 				p.SendRequest(n, b)
 			}
@@ -208,6 +217,7 @@ func (p *Peer) act() {
 			switch {
 			case p.connection_info.am_interested:
 				p.Send(NotInterestedMessage{}.bytes())
+				p.connection_info.am_interested = false
 			}
 		}
 	}
@@ -215,10 +225,18 @@ func (p *Peer) act() {
 
 func (p *Peer) handlePiece(m PieceMessage) {
 	p.outstanding_request_count -= 1
+	fmt.Println("Adding piece to clientchan", len(p.clientChannel))
 	p.clientChannel <- m
 }
 
-func (peer *Peer) handleRequest(m RequestMessage) {
+func (p *Peer) handleRequest(m RequestMessage) {
+	// send piece requested
+	msg := InternalRequestMessage{m, make(chan *PieceMessage)}
+	p.clientChannel <- msg
+	ret := <-msg.ret
+	if ret != nil {
+		p.Send(ret.bytes())
+	}
 }
 
 func (peer *Peer) handleBitField(m BitFieldMessage) {

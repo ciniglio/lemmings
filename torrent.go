@@ -49,17 +49,41 @@ func LaunchTorrent(torrent_file string, done chan int) {
 						torrent.our_pieces.pieces[msg.index].data,
 						msg.index,
 					}
+					broadcast(peers, InternalHaveMessage{msg.index})
 				}
 			case i_write_block:
 				fmt.Println("About to write")
 				fw.messages <- m
 			case i_subscribe:
-				msg := m.(*InternalSubscribeMessage)
+				fmt.Println("Subscribed a peer")
+				msg := m.(InternalSubscribeMessage)
 				peers = append(peers, msg.c)
+			case i_request:
+				msg := m.(InternalRequestMessage)
+				req := msg.m
+				b := torrent.our_pieces.GetBlockAtPieceAndOffset(req.index, req.begin, req.length)
+				if b != nil {
+					ret := new(PieceMessage)
+					ret.index = req.index
+					ret.begin = req.begin
+					ret.block = b
+					msg.ret <- ret
+				} else {
+					msg.ret <- nil
+				}
 			default:
 				fmt.Println("Got weird internal request")
 			}
 		}
 	}
 	done <- 0
+}
+
+func broadcast(channels []chan Message, m Message) {
+	fmt.Println("Number of broadcast channels:", len(channels))
+	for i := range channels {
+		go func(ch chan Message) {
+			ch <- m
+		}(channels[i])
+	}
 }
