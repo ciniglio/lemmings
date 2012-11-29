@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-func LaunchTorrent(torrent_file string, done chan int){
-	c := make(chan Message, 1000)
+func LaunchTorrent(torrent_file string, done chan int) {
+	c := make(chan Message, 1)
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -19,14 +19,13 @@ func LaunchTorrent(torrent_file string, done chan int){
 	fw := NewFileWriter(torrent, torrent_file)
 	go fw.Run()
 
-	peers := make([]chan Message, 0)
-
 	for p := range msg {
 		peer := CreatePeer(p, torrent, c)
 		if peer != nil {
 			go peer.runPeer()
 		}
 	}
+	peers := make([]chan Message, 0)
 	for {
 		select {
 		case m := <-c:
@@ -43,7 +42,14 @@ func LaunchTorrent(torrent_file string, done chan int){
 				torrent.our_pieces.RequestedPieceAndOffset(i, b)
 			case piece_t:
 				msg := m.(PieceMessage)
-				torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index, msg.begin, msg.block)
+				if torrent.our_pieces.SetBlockAtPieceAndOffset(msg.index,
+					msg.begin,
+					msg.block) {
+					fw.messages <- InternalWriteBlockMessage{
+						torrent.our_pieces.pieces[msg.index].data,
+						msg.index,
+					}
+				}
 			case i_write_block:
 				fmt.Println("About to write")
 				fw.messages <- m

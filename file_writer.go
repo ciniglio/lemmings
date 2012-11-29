@@ -74,9 +74,8 @@ func (fw *FileWriter) Run() {
 			}
 		}
 
-
 		file_name := f.path[len(f.path)-1]
-		fi, err := os.Create(path.Join(dir,file_name))
+		fi, err := os.Create(path.Join(dir, file_name))
 		if err != nil {
 			fmt.Println("Error Create file", err, f)
 		}
@@ -113,7 +112,7 @@ func (fw *FileWriter) write(b []byte, index int) {
 		if remaining <= 0 {
 			break
 		}
-		
+
 		cur += f.length
 		if offset < cur {
 			file_offset := offset - prev

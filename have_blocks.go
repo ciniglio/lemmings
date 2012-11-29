@@ -151,7 +151,7 @@ func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
 	return p.pieces[i].blocks[offset/int(block_size)]
 }
 
-func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
+func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) bool {
 	if p.pieces[i].blocks == nil {
 		p.initBlocksAtPiece(i)
 	}
@@ -159,24 +159,24 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) {
 		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
 		fmt.Printf("Compare to index: %d\n", p.Length())
 
-		return
+		return false
 	}
 	if len(b) < 16384 && i < (p.Length()-1) {
 		fmt.Printf("Got a bad block")
-		return
+		return false
 	}
 	p.pieces[i].blocks[offset/int(block_size)] = true
 	for j, by := range b {
 		p.pieces[i].data[offset+j] = by
 	}
 	p.pieces[i].blocks_requested[offset/int(block_size)] = false
-	p.checkPiece(i)
+	return p.checkPiece(i)
 }
 
-func (p *Pieces) checkPiece(i int) {
+func (p *Pieces) checkPiece(i int) bool {
 	for _, b := range p.pieces[i].blocks {
 		if !b {
-			return
+			return false
 		}
 	}
 	fmt.Println("Blocks: ", p.pieces[i].blocks)
@@ -195,14 +195,14 @@ func (p *Pieces) checkPiece(i int) {
 			p.pieces[i].blocks = nil
 			p.pieces[i].blocks_requested = nil
 			fmt.Println("Bad Hash")
-			return
+			return false
 		}
 	}
-	fmt.Println("Going to add to client_chan", len(p.client_chan))
-	p.client_chan <- InternalWriteBlockMessage{p.pieces[i].data, i}
+	fmt.Println("Going to add write message to client_chan", len(p.client_chan))
 
 	p.pieces[i].have = true
 	p.pieces[i].requested = false
+	return true
 }
 
 func CreateNewPieces(num_pieces int, t *TorrentInfo) *Pieces {
