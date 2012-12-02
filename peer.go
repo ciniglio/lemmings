@@ -32,6 +32,7 @@ type Peer struct {
 	torrent_info              *TorrentInfo
 	torrent_peer              torrentPeer
 	connection                *net.TCPConn
+	connected                 bool
 	connection_info           *PeerConnectionInfo
 	their_id                  [20]byte
 	shook_hands               bool
@@ -70,8 +71,8 @@ func (peer *Peer) connect() bool {
 	}
 	peer.connection.SetKeepAlive(true)
 
-	peer.clientChannel <- InternalSubscribeMessage{peer.messageChannel}
-
+	
+	peer.connected = true
 	return true
 }
 
@@ -89,13 +90,17 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 }
 
 func (peer *Peer) runPeer() {
-	if !peer.connect() {
+	if !peer.connected && !peer.connect() {
 		fmt.Println("Connection problem")
 		return
 	}
-	peer.initiateHandshake()
+	if !peer.shook_hands { 
+		peer.initiateHandshake()
+		fmt.Println("Sent Handshake")
+	}
+	peer.clientChannel <- InternalSubscribeMessage{peer.messageChannel}
 	go peer.readerRoutine()
-	fmt.Println("Sent Handshake")
+
 	for {
 		runtime.Gosched()
 		select {

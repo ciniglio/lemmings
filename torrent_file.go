@@ -36,6 +36,15 @@ func ReadTorrentFile(path string, c chan Message) (*TorrentInfo, error) {
 	return t, nil
 }
 
+func FindInfoHash(path string) string {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	t := ParseTorrentInfo(b)
+	return t.info_hash
+}
+
 func (t *TorrentInfo) add_info_hash(info bItem) {
 	h := sha1.New()
 	h.Write(info.raw)

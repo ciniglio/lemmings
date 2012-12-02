@@ -1,6 +1,8 @@
 package tracker
 
-import ()
+import (
+	"net"
+)
 
 type kind int
 
@@ -24,6 +26,7 @@ const (
 	i_subscribe
 	i_request
 	i_have
+	i_add_peer
 )
 
 type Message interface {
@@ -201,3 +204,10 @@ type InternalHaveMessage struct {
 }
 
 func (c InternalHaveMessage) kind() kind { return i_have }
+
+type InternalAddPeerMessage struct {
+	c       *net.TCPConn
+	peer_id string
+}
+
+func (c InternalAddPeerMessage) kind() kind { return i_add_peer }

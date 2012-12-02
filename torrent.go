@@ -2,10 +2,23 @@ package tracker
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 )
 
-func LaunchTorrent(torrent_file string, done chan int) {
+type Torrent struct {
+	messages chan Message
+}
+
+func LaunchTorrent(torrent_file string, done chan int) (string, Torrent) {
 	c := make(chan Message, 1)
+	t := Torrent{c}
+	go t.RunTorrent(torrent_file, done)
+	return FindInfoHash(torrent_file), t
+}
+
+func (t Torrent) RunTorrent(torrent_file string, done chan int) {
+	c := t.messages
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -71,6 +84,23 @@ func LaunchTorrent(torrent_file string, done chan int) {
 				} else {
 					msg.ret <- nil
 				}
+			case i_add_peer:
+				msg := m.(InternalAddPeerMessage)
+				ip, port, err := net.SplitHostPort(msg.c.RemoteAddr().String())
+				if err != nil {
+					fmt.Println("Error splitting host and port",
+						msg.c.RemoteAddr())
+				}
+				iport, _ := strconv.Atoi(port)	
+				p := torrentPeer{msg.peer_id, 
+					ip,
+					iport,
+				}
+				peer := CreatePeer(p, torrent, c)
+				peer.connection = msg.c
+				peer.shook_hands = true
+				peer.connected = true
+				go peer.runPeer()
 			default:
 				fmt.Println("Got weird internal request")
 			}
