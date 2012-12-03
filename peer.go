@@ -40,6 +40,7 @@ type Peer struct {
 	outstanding_request_count int
 	messageChannel            chan Message
 	clientChannel             chan Message
+	torrent                   Torrent
 }
 
 func InitialConnectionInfo() *PeerConnectionInfo {
@@ -76,7 +77,7 @@ func (peer *Peer) connect() bool {
 	return true
 }
 
-func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
+func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) *Peer {
 	peer := new(Peer)
 	peer.torrent_info = t
 	peer.torrent_peer = p
@@ -86,6 +87,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message) *Peer {
 	peer.their_pieces = CreateNewPieces(t.numpieces, t)
 	peer.messageChannel = make(chan Message, 10) // magic number
 	peer.clientChannel = m
+	peer.torrent = torrent
 	return peer
 }
 
@@ -198,13 +200,22 @@ func (p *Peer) sendCancel(m InternalCancelMessage) {
 
 func (p *Peer) act() {
 	switch {
-	//case p.connection_info.am_interested && p.connection_info.peer_choking:
-	//p.Send(UnchokeMessage{}.bytes())
+	case p.connection_info.am_interested && p.connection_info.peer_choking:
+		p.Send(InterestedMessage{}.bytes())
+	case p.connection_info.peer_interested && p.connection_info.am_choking:
+		if p.torrent.CanUnchoke() {
+			p.connection_info.am_choking = false
+			p.Send(UnchokeMessage{}.bytes())
+		}
+	case !p.connection_info.peer_interested && !p.connection_info.am_choking:
+		p.torrent.WillChoke()
+		p.connection_info.am_choking = true
+		p.Send(ChokeMessage{}.bytes())
 	default:
 		n, b := p.GetIndexAndBeginForRequest()
 		if n >= 0 && b >= 0 {
 			switch {
-			case !p.connection_info.am_interested: // || p.connection_info.peer_choking:
+			case !p.connection_info.am_interested:
 				p.connection_info.am_interested = true
 				fmt.Println("Sending Interested")
 				p.Send(InterestedMessage{}.bytes())
@@ -229,7 +240,6 @@ func (p *Peer) handlePiece(m PieceMessage) {
 }
 
 func (p *Peer) handleRequest(m RequestMessage) {
-	// send piece requested
 	msg := InternalRequestMessage{m, make(chan *PieceMessage)}
 	p.clientChannel <- msg
 	ret := <-msg.ret

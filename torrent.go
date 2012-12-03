@@ -33,12 +33,13 @@ func (t Torrent) RunTorrent(torrent_file string, done chan int) {
 	go fw.Run()
 
 	for p := range msg {
-		peer := CreatePeer(p, torrent, c)
+		peer := CreatePeer(p, torrent, c, t)
 		if peer != nil {
 			go peer.runPeer()
 		}
 	}
 	peers := make([]chan Message, 0)
+	num_unchoked := 0
 	for {
 		select {
 		case m := <-c:
@@ -100,17 +101,37 @@ func (t Torrent) RunTorrent(torrent_file string, done chan int) {
 					ip,
 					iport,
 				}
-				peer := CreatePeer(p, torrent, c)
+				peer := CreatePeer(p, torrent, c, t)
 				peer.connection = msg.c
 				peer.shook_hands = true
 				peer.connected = true
 				go peer.runPeer()
+			case i_can_unchoke:
+				msg := m.(InternalCanUnchokeMessage)
+				if num_unchoked < 5 {
+					num_unchoked++
+					msg.ret <- true
+				} else {
+					msg.ret <- false
+				}
+			case i_will_choke:
+				num_unchoked--
 			default:
 				fmt.Println("Got weird internal request")
 			}
 		}
 	}
 	done <- 0
+}
+
+func (t Torrent) CanUnchoke() bool {
+	c := make(chan bool)
+	t.messages <- InternalCanUnchokeMessage{c}
+	return <- c
+}
+
+func (t Torrent) WillChoke() {
+	t.messages <- InternalChokingMessage{}
 }
 
 func broadcast(channels []chan Message, m Message) {
