@@ -243,7 +243,7 @@ func (peer *Peer) handleBitField(m BitFieldMessage) {
 }
 
 func (peer *Peer) handleHave(m HaveMessage) {
-	peer.their_pieces.setAtIndex(m.index, true)
+	peer.their_pieces.AddHave(m.index)
 }
 
 func (p *Peer) readerRoutine() {
