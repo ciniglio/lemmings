@@ -133,9 +133,9 @@ func (peer *Peer) runPeer() {
 				fmt.Println("Piece")
 				// talk to client
 				peer.handlePiece(msg.(PieceMessage))
-			case i_recv_block:
+			case i_cancel:
 				fmt.Println("Other peer recieved block")
-				peer.sendCancel(msg.(InternalReceivedBlockMessage))
+				peer.sendCancel(msg.(InternalCancelMessage))
 			case i_have:
 				fmt.Println("Recieved Broadcast")
 				peer.Send(HaveMessage(msg.(InternalHaveMessage)).bytes())
@@ -174,30 +174,24 @@ func (p *Peer) GetIndexAndBeginForRequest() (int, int) {
 
 func (p *Peer) SendRequest(index, begin int) {
 	if p.outstanding_request_count < 2 {
-		m := RequestMessage{}
-		m.index = index
-		m.begin = begin
-		m.length = p.their_pieces.blockSize(index, begin/int(block_size))
+		m := RequestMessage{
+			index, 
+			begin,
+			p.their_pieces.blockSize(index, begin/int(block_size)),
+		}
 		p.outstanding_request_count += 1
 		p.Send(m.bytes())
-		n := new(InternalSendingRequestMessage)
-		n.index = index
-		n.begin = begin
+		n := InternalSendingRequestMessage{ index, begin }
 		fmt.Println("Adding sent request to clientchan", len(p.clientChannel))
-		p.clientChannel <- n
+		p.clientChannel <- &n
 	}
 }
 
-func (p *Peer) sendCancel(m InternalReceivedBlockMessage) {
+func (p *Peer) sendCancel(m InternalCancelMessage) {
 	if p.outstanding_request_count > 0 {
 		if p.their_pieces.requested(m.index, m.begin) {
-			msg := new(CancelMessage)
-			msg.index = m.index
-			msg.begin = m.begin
-
-			msg.length = p.their_pieces.blockSize(m.index, m.begin)
 			p.outstanding_request_count -= 1
-			p.Send(msg.bytes())
+			p.Send(CancelMessage(m).bytes())
 		}
 	}
 }

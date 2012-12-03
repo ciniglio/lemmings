@@ -63,6 +63,10 @@ func (t Torrent) RunTorrent(torrent_file string, done chan int) {
 						msg.index,
 					}
 					broadcast(peers, InternalHaveMessage{msg.index})
+					broadcast(peers, InternalCancelMessage{msg.index,
+					        msg.begin,
+						len(msg.block),
+					})
 				}
 			case i_write_block:
 				fmt.Println("About to write")

@@ -26,6 +26,7 @@ const (
 	i_subscribe
 	i_request
 	i_have
+	i_cancel
 	i_add_peer
 )
 
@@ -204,6 +205,14 @@ type InternalHaveMessage struct {
 }
 
 func (c InternalHaveMessage) kind() kind { return i_have }
+
+type InternalCancelMessage struct {
+	index  int
+	begin  int
+	length int
+}
+
+func (c InternalCancelMessage) kind() kind { return i_cancel }
 
 type InternalAddPeerMessage struct {
 	c       *net.TCPConn
