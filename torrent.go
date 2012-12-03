@@ -7,14 +7,16 @@ import (
 )
 
 type Torrent struct {
-	messages  chan Message
-	info_hash string
-	client_id string
+	messages   chan Message
+	info_hash  string
+	client_id  string
+	uploaded   int
+	downloaded int
 }
 
 func LaunchTorrent(torrent_file string, done chan int) (string, Torrent) {
 	c := make(chan Message)
-	t := Torrent{c, FindInfoHash(torrent_file), string(RandomBytes(20))}
+	t := Torrent{c, FindInfoHash(torrent_file), string(RandomBytes(20)), 0, 0}
 	go t.runTorrent(torrent_file, done)
 	return t.info_hash, t
 }
@@ -71,6 +73,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 						msg.begin,
 						len(msg.block),
 					})
+					t.downloaded += len(msg.block)
 				}
 			case i_write_block:
 				fmt.Println("About to write")
@@ -88,6 +91,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 					ret.index = req.index
 					ret.begin = req.begin
 					ret.block = b
+					t.uploaded += req.length
 					msg.ret <- ret
 				} else {
 					msg.ret <- nil
