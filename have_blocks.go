@@ -3,6 +3,7 @@ package tracker
 import (
 	"crypto/sha1"
 	"fmt"
+	"time"
 )
 
 type piece struct {
@@ -10,6 +11,7 @@ type piece struct {
 	requested        bool
 	blocks           []bool
 	blocks_requested []bool
+	b_requested_at   []time.Time
 	data             []byte
 }
 
@@ -19,6 +21,14 @@ type Pieces struct {
 	total_length int
 	hashes       []string
 	client_chan  chan Message
+}
+
+func (p *Pieces) String() string {
+	s := []byte("")
+	for _, v := range p.pieces {
+		s = append(s, []byte(fmt.Sprintf("<%v>", v.have))...)
+	}
+	return string(s)
 }
 
 func (p *Pieces) Length() int {
@@ -62,6 +72,7 @@ func (p *Pieces) initBlocksAtPiece(i int) {
 	size := p.numBlocks(i)
 	p.pieces[i].blocks = make([]bool, size)
 	p.pieces[i].blocks_requested = make([]bool, size)
+	p.pieces[i].b_requested_at = make([]time.Time, size)
 	p.pieces[i].data = make([]byte, p.pieceSize(i))
 }
 
@@ -75,6 +86,7 @@ func (p *Pieces) RequestedPieceAndOffset(piece, offset int) {
 		p.initBlocksAtPiece(piece)
 	}
 	p.pieces[piece].blocks_requested[offset/int(block_size)] = true
+	p.pieces[piece].b_requested_at[offset/int(block_size)] = time.Now()
 }
 
 func (p *Pieces) requested(index, begin int) bool {
@@ -84,19 +96,11 @@ func (p *Pieces) requested(index, begin int) bool {
 	return p.pieces[index].requested && p.pieces[index].blocks_requested[begin]
 }
 
-func (p *Pieces) String() string {
-	s := []byte("")
-	for _, v := range p.pieces {
-		s = append(s, []byte(fmt.Sprintf("<%v>", v.have))...)
-	}
-	return string(s)
-}
 
 func (ours *Pieces) GetBlockAtPieceAndOffset(i, o, l int) []byte {
 	if !ours.pieces[i].have {
 		return nil
 	}
-
 	return ours.pieces[i].data[o : o+l]
 }
 
@@ -119,6 +123,10 @@ func (ours *Pieces) CreateBitField() (b []byte) {
 	return b
 }
 
+func (p *Pieces) AddHave(i int) {
+	p.setAtIndex(i, true)
+}
+
 func (p *Pieces) AddBitField(b []byte) {
 	ind := 0
 	for i := range b {
@@ -133,14 +141,22 @@ func (p *Pieces) AddBitField(b []byte) {
 	}
 }
 
+func (p piece) needBlock(o int) bool {
+	max_age := 5 * time.Minute
+	have := p.blocks[o]
+	req  := p.blocks_requested[o]
+	stale := time.Since(p.b_requested_at[o]) > max_age
+	return !have && (!req || stale)
+}
+
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
 		// for an incomplete piece that is in progress, get
 		// remaining blocks
 		if !p.have && p.requested && theirs.pieces[i].have {
-			for j, b := range p.blocks {
-				if !b && !p.blocks_requested[j] {
+			for j := range p.blocks {
+				if p.needBlock(j) {
 					return i, (j * int(block_size))
 				}
 			}
