@@ -13,17 +13,18 @@ type Torrent struct {
 func LaunchTorrent(torrent_file string, done chan int) (string, Torrent) {
 	c := make(chan Message, 1)
 	t := Torrent{c}
-	go t.RunTorrent(torrent_file, done)
+	go t.runTorrent(torrent_file, done)
 	return FindInfoHash(torrent_file), t
 }
 
-func (t Torrent) RunTorrent(torrent_file string, done chan int) {
+func (t Torrent) runTorrent(torrent_file string, done chan int) {
 	c := t.messages
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
 	}
+	
 	tracker_proxy := NewTrackerProxy(torrent)
 	msg := make(chan torrentPeer)
 	get_peers := InternalGetPeersMessage{ret: msg}

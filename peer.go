@@ -20,24 +20,18 @@ type PeerConnectionInfo struct {
 	am_interested   bool
 }
 
-type HandshakeMessage struct {
-	pstrlen   byte
-	pstr      []byte
-	reserved  [8]byte
-	info_hash [20]byte
-	peer_id   [20]byte
-}
-
 type Peer struct {
 	torrent_info              *TorrentInfo
 	torrent_peer              torrentPeer
 	connection                *net.TCPConn
+
 	connected                 bool
 	connection_info           *PeerConnectionInfo
-	their_id                  [20]byte
 	shook_hands               bool
-	their_pieces              *Pieces
 	outstanding_request_count int
+
+	their_pieces              *Pieces
+
 	messageChannel            chan Message
 	clientChannel             chan Message
 	torrent                   Torrent
@@ -71,8 +65,6 @@ func (peer *Peer) connect() bool {
 		fmt.Println("Connected to a peer: ", dest_addr.IP, dest_addr.Port)
 	}
 	peer.connection.SetKeepAlive(true)
-
-	
 	peer.connected = true
 	return true
 }
@@ -354,14 +346,23 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	return msg, curpos
 }
 
-func (p *Peer) parseHandshakeMessage(b *[]byte) (*HandshakeMessage, int) {
+
+type handshakeMessage struct {
+	pstrlen   byte
+	pstr      []byte
+	reserved  [8]byte
+	info_hash [20]byte
+	peer_id   [20]byte
+}
+
+func (p *Peer) parseHandshakeMessage(b *[]byte) (*handshakeMessage, int) {
 	if p.shook_hands {
 		return nil, 0
 	}
 	fmt.Println("Parsing handshake")
 	m := *b
 	curpos := 0
-	message := new(HandshakeMessage)
+	message := new(handshakeMessage)
 	message.pstrlen = m[0]
 	if message.pstrlen != byte(len("BitTorrent protocol")) {
 		return nil, 0
@@ -396,7 +397,7 @@ func (p *Peer) parseHandshakeMessage(b *[]byte) (*HandshakeMessage, int) {
 }
 
 func (p *Peer) initiateHandshake() {
-	message := new(HandshakeMessage)
+	message := new(handshakeMessage)
 	message.pstrlen = byte(len("BitTorrent protocol"))
 	message.pstr = make([]byte, len("BitTorrent protocol"))
 	binary.Read(strings.NewReader("BitTorrent protocol"),
@@ -413,7 +414,7 @@ func (p *Peer) initiateHandshake() {
 	return
 }
 
-func (h *HandshakeMessage) bytes() []byte {
+func (h *handshakeMessage) bytes() []byte {
 	buf := new(bytes.Buffer)
 	buf.WriteByte(h.pstrlen)
 	buf.Write(h.pstr)
