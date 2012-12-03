@@ -17,6 +17,7 @@ type piece struct {
 
 type Pieces struct {
 	pieces       []piece
+	num_have     int
 	piece_length int
 	total_length int
 	hashes       []string
@@ -124,6 +125,7 @@ func (ours *Pieces) CreateBitField() (b []byte) {
 }
 
 func (p *Pieces) AddHave(i int) {
+	p.num_have++
 	p.setAtIndex(i, true)
 }
 
@@ -141,22 +143,26 @@ func (p *Pieces) AddBitField(b []byte) {
 	}
 }
 
-func (p piece) needBlock(o int) bool {
-	max_age := 5 * time.Minute
+func (p piece) needBlock(o, rem int) bool {
+	max_age := 2 * time.Minute
 	have := p.blocks[o]
 	req  := p.blocks_requested[o]
 	stale := time.Since(p.b_requested_at[o]) > max_age
-	return !have && (!req || stale)
+	if rem >5 {
+		return !have && (!req || stale)
+	}
+	return !have
 }
 
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
+	remaining := ours.Length() - ours.num_have 
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
 		// for an incomplete piece that is in progress, get
 		// remaining blocks
 		if !p.have && p.requested && theirs.pieces[i].have {
 			for j := range p.blocks {
-				if p.needBlock(j) {
+				if p.needBlock(j, remaining) {
 					return i, (j * int(block_size))
 				}
 			}
@@ -215,7 +221,7 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) bool {
 
 		return false
 	}
-	if len(b) < 16384 && i < (p.Length()-1) {
+	if len(b) != 16384 && i < (p.Length()-1) {
 		fmt.Printf("Got a bad block")
 		return false
 	}
@@ -254,7 +260,7 @@ func (p *Pieces) checkPiece(i int) bool {
 	}
 	fmt.Println("Going to add write message to client_chan", len(p.client_chan))
 
-	p.pieces[i].have = true
+	p.setAtIndex(i, true)
 	p.pieces[i].requested = false
 	return true
 }
