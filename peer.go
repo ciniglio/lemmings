@@ -43,7 +43,7 @@ type Peer struct {
 	torrent                   Torrent
 }
 
-func InitialConnectionInfo() *PeerConnectionInfo {
+func initialConnectionInfo() *PeerConnectionInfo {
 	ci := new(PeerConnectionInfo)
 	ci.peer_choking, ci.am_choking = true, true
 	ci.peer_interested, ci.am_interested = false, false
@@ -83,7 +83,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) 
 	peer.torrent_peer = p
 	fmt.Println("Peer in CreatePeer", p)
 
-	peer.connection_info = InitialConnectionInfo()
+	peer.connection_info = initialConnectionInfo()
 	peer.their_pieces = CreateNewPieces(t.numpieces, t)
 	peer.messageChannel = make(chan Message, 10) // magic number
 	peer.clientChannel = m
@@ -91,7 +91,7 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) 
 	return peer
 }
 
-func (peer *Peer) runPeer() {
+func (peer *Peer) RunPeer() {
 	if !peer.connected && !peer.connect() {
 		fmt.Println("Connection problem")
 		return
@@ -140,7 +140,7 @@ func (peer *Peer) runPeer() {
 				peer.sendCancel(msg.(InternalCancelMessage))
 			case i_have:
 				fmt.Println("Recieved Broadcast")
-				peer.Send(HaveMessage(msg.(InternalHaveMessage)).bytes())
+				peer.send(HaveMessage(msg.(InternalHaveMessage)).bytes())
 			default:
 				fmt.Println("Something weird")
 			}
@@ -150,7 +150,7 @@ func (peer *Peer) runPeer() {
 	}
 }
 
-func (p *Peer) Send(b []byte) {
+func (p *Peer) send(b []byte) {
 	n := 0
 	var err error
 	fmt.Println("trying to send:", b)
@@ -164,7 +164,7 @@ func (p *Peer) Send(b []byte) {
 	}
 }
 
-func (p *Peer) GetIndexAndBeginForRequest() (int, int) {
+func (p *Peer) getIndexAndBeginForRequest() (int, int) {
 	m := new(InternalGetRequestMessage)
 	m.pieces = p.their_pieces
 	m.ret = make(chan int, 2)
@@ -174,7 +174,7 @@ func (p *Peer) GetIndexAndBeginForRequest() (int, int) {
 	return index, begin
 }
 
-func (p *Peer) SendRequest(index, begin int) {
+func (p *Peer) sendRequest(index, begin int) {
 	if p.outstanding_request_count < 2 {
 		m := RequestMessage{
 			index, 
@@ -182,7 +182,7 @@ func (p *Peer) SendRequest(index, begin int) {
 			p.their_pieces.blockSize(index, begin/int(block_size)),
 		}
 		p.outstanding_request_count += 1
-		p.Send(m.bytes())
+		p.send(m.bytes())
 		n := InternalSendingRequestMessage{ index, begin }
 		fmt.Println("Adding sent request to clientchan", len(p.clientChannel))
 		p.clientChannel <- &n
@@ -193,7 +193,7 @@ func (p *Peer) sendCancel(m InternalCancelMessage) {
 	if p.outstanding_request_count > 0 {
 		if p.their_pieces.requested(m.index, m.begin) {
 			p.outstanding_request_count -= 1
-			p.Send(CancelMessage(m).bytes())
+			p.send(CancelMessage(m).bytes())
 		}
 	}
 }
@@ -201,32 +201,32 @@ func (p *Peer) sendCancel(m InternalCancelMessage) {
 func (p *Peer) act() {
 	switch {
 	case p.connection_info.am_interested && p.connection_info.peer_choking:
-		p.Send(InterestedMessage{}.bytes())
+		p.send(InterestedMessage{}.bytes())
 	case p.connection_info.peer_interested && p.connection_info.am_choking:
 		if p.torrent.CanUnchoke() {
 			p.connection_info.am_choking = false
-			p.Send(UnchokeMessage{}.bytes())
+			p.send(UnchokeMessage{}.bytes())
 		}
 	case !p.connection_info.peer_interested && !p.connection_info.am_choking:
 		p.torrent.WillChoke()
 		p.connection_info.am_choking = true
-		p.Send(ChokeMessage{}.bytes())
+		p.send(ChokeMessage{}.bytes())
 	default:
-		n, b := p.GetIndexAndBeginForRequest()
+		n, b := p.getIndexAndBeginForRequest()
 		if n >= 0 && b >= 0 {
 			switch {
 			case !p.connection_info.am_interested:
 				p.connection_info.am_interested = true
 				fmt.Println("Sending Interested")
-				p.Send(InterestedMessage{}.bytes())
-				p.SendRequest(n, b)
+				p.send(InterestedMessage{}.bytes())
+				p.sendRequest(n, b)
 			case !p.connection_info.peer_choking:
-				p.SendRequest(n, b)
+				p.sendRequest(n, b)
 			}
 		} else {
 			switch {
 			case p.connection_info.am_interested:
-				p.Send(NotInterestedMessage{}.bytes())
+				p.send(NotInterestedMessage{}.bytes())
 				p.connection_info.am_interested = false
 			}
 		}
@@ -244,7 +244,7 @@ func (p *Peer) handleRequest(m RequestMessage) {
 	p.clientChannel <- msg
 	ret := <-msg.ret
 	if ret != nil {
-		p.Send(ret.bytes())
+		p.send(ret.bytes())
 	}
 }
 

@@ -35,7 +35,7 @@ func (t Torrent) RunTorrent(torrent_file string, done chan int) {
 	for p := range msg {
 		peer := CreatePeer(p, torrent, c, t)
 		if peer != nil {
-			go peer.runPeer()
+			go peer.RunPeer()
 		}
 	}
 	peers := make([]chan Message, 0)
@@ -105,7 +105,7 @@ func (t Torrent) RunTorrent(torrent_file string, done chan int) {
 				peer.connection = msg.c
 				peer.shook_hands = true
 				peer.connected = true
-				go peer.runPeer()
+				go peer.RunPeer()
 			case i_can_unchoke:
 				msg := m.(InternalCanUnchokeMessage)
 				if num_unchoked < 5 {
