@@ -99,9 +99,12 @@ func (p *Pieces) requested(index, begin int) bool {
 
 
 func (ours *Pieces) GetBlockAtPieceAndOffset(i, o, l int) []byte {
-	if !ours.pieces[i].have {
+	size := ours.blockSize(i, o)
+
+	if i > ours.Length() || !ours.pieces[i].have || l > (size - o) {
 		return nil
 	}
+
 	return ours.pieces[i].data[o : o+l]
 }
 
