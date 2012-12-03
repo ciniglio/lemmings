@@ -8,25 +8,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 )
 
-type trackerGetRequest struct {
-	announce_url string
-	info_hash    string
-	peer_id      string
-	port         string
-	ip_addr      string //optional
-	uploaded     int
-	downloaded   int
-	left         int
-	compact      int    // 0 or 1
-	no_peer_id   int    // 0 or 1, optional
-	event        string // started, stopped or completed (can be blank)
-	numwant      int    // optional
-	key          string // optional
-	tracker_id   string // optional
-
-}
 
 type torrentPeer struct {
 	peer_id string //optional initially
@@ -47,7 +31,9 @@ type trackerResponse struct {
 type TrackerProxy struct {
 	tgr      *trackerGetRequest
 	response *trackerResponse
+	event    string
 	msg      chan Message
+	timeout  <- chan time.Time
 }
 
 func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
@@ -56,6 +42,7 @@ func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
 	tgr.info_hash = t.info_hash
 	tgr.peer_id = t.client_id
 	tgr.announce_url = t.announce
+	tp.event = "started"
 	tp.tgr = tgr
 	tp.msg = make(chan Message)
 	go tp.handleMessages()
@@ -63,16 +50,45 @@ func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
 }
 
 func (t *TrackerProxy) handleMessages() {
-	for m := range t.msg {
-		switch m.kind() {
-		case i_get_peers:
-			msg := m.(InternalGetPeersMessage)
-			for _, p := range t.GetPeers() {
-				msg.ret <- p
+	for {
+		select {
+		case m := <- t.msg:
+			switch m.kind() {
+			case i_get_peers:
+				msg := m.(InternalGetPeersMessage)
+				for _, p := range t.GetPeers() {
+					msg.ret <- p
+				}
+				close(msg.ret)
 			}
-			close(msg.ret)
+		case <- t.timeout:
+			for _ = range t.GetPeers() {
+			}
 		}
 	}
+}
+
+func (t *TrackerProxy) GetPeers() []torrentPeer {
+	t.response = t.tgr.makeTrackerRequest()
+	t.timeout = time.After(time.Duration(t.response.interval) * time.Second)
+	return t.response.peers
+}
+
+type trackerGetRequest struct {
+	announce_url string
+	info_hash    string
+	peer_id      string
+	port         string
+	ip_addr      string //optional
+	uploaded     int
+	downloaded   int
+	left         int
+	compact      int    // 0 or 1
+	no_peer_id   int    // 0 or 1, optional
+	event        string // started, stopped or completed (can be blank)
+	numwant      int    // optional
+	key          string // optional
+	tracker_id   string // optional
 }
 
 func (t *trackerGetRequest) generateGetString() string {
@@ -80,31 +96,29 @@ func (t *trackerGetRequest) generateGetString() string {
 	v := url.Values{}
 	v.Set("info_hash", t.info_hash)
 	v.Set("peer_id", t.peer_id)
+	v.Set("event", t.event)
 	u.RawQuery = v.Encode()
 	return u.String()
 }
 
 func (t *trackerGetRequest) makeTrackerRequest() *trackerResponse {
 	q := t.generateGetString()
+	t.event = ""
 	fmt.Printf("Tracker Announce: %v\n\n", q)
 	res, err := http.Get(q)
 	if err != nil {
 		log.Fatal(err)
 	}
-	robots, err := ioutil.ReadAll(res.Body)
+	b, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	tr := parseTrackerResponse(string(robots))
-	fmt.Printf("Tracker Response: %s\n\n", string(robots))
+	tr := parseTrackerResponse(string(b))
+	fmt.Printf("Tracker Response: %s\n\n", string(b))
 	return tr
 }
 
-func (t *TrackerProxy) GetPeers() []torrentPeer {
-	t.response = t.tgr.makeTrackerRequest()
-	return t.response.peers
-}
 
 func parsePeersDictionary(m []bItem) []torrentPeer {
 	out := []torrentPeer{}
