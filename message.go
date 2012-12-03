@@ -30,6 +30,7 @@ const (
 	i_add_peer
 	i_can_unchoke
 	i_will_choke
+	i_add_torrent
 )
 
 type Message interface {
@@ -232,3 +233,9 @@ func (c InternalCanUnchokeMessage) kind() kind { return i_can_unchoke }
 type InternalChokingMessage struct{}
 
 func (c InternalChokingMessage) kind() kind { return i_will_choke }
+
+type InternalAddTorrentMessage struct {
+	filename string
+}
+
+func (c InternalAddTorrentMessage) kind() kind { return i_add_torrent }

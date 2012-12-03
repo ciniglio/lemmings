@@ -8,47 +8,54 @@ import (
 const PORT int = 56565
 const handshake_length int = 68
 
-type client struct {
+type Client struct {
 	torrents map[string](*Torrent)
+	messages chan Message
 }
 
-func Run() {
-	torrent_files := []string{
-		"test/test2.torrent",
-		"test/test.torrent",
-	}
+func NewClient() Client {
+	c:= Client{make(map[string](*Torrent)), make(chan Message)}
+	return c
+}
 
+func (self Client) Run() {
 	addr := &net.TCPAddr{nil, PORT}
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		fmt.Println("Listening error:", err)
 	}
 
-	self := client{make(map[string](*Torrent))}
 	done := make(chan int)
-
-	for i := range torrent_files {
-		s, t := LaunchTorrent(torrent_files[i], done)
-		self.torrents[s] = &t
-	}
-
 	for {
-		c, err := listener.AcceptTCP()
-		if err != nil {
-			fmt.Println("Accept Error:", err)
-			continue
+		select {
+		case m := <- self.messages:
+			msg := m.(InternalAddTorrentMessage)
+
+			s, t := LaunchTorrent(msg.filename, done)
+			self.torrents[s] = &t
+		default:
+			c, err := listener.AcceptTCP()
+			if err != nil {
+				fmt.Println("Accept Error:", err)
+				continue
+			}
+			ih, peer_id := getInfoHashFromPeer(c)
+			if ih == "" {
+				continue
+			}
+			t := self.torrents[ih]
+			if t == nil {
+				continue
+			}
+			t.messages <- InternalAddPeerMessage{c, peer_id}
 		}
-		ih, peer_id := getInfoHashFromPeer(c)
-		if ih == "" {
-			continue
-		}
-		t := self.torrents[ih]
-		if t == nil {
-			continue
-		}
-		t.messages <- InternalAddPeerMessage{c, peer_id}
 	}
 }
+
+func (self Client) AddTorrent(name string) {
+	self.messages <- InternalAddTorrentMessage{name}
+}
+
 
 func getInfoHashFromPeer(c net.Conn) (string, string) {
 	b := make([]byte, handshake_length)
