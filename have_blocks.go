@@ -25,10 +25,6 @@ func (p *Pieces) Length() int {
 	return len(p.pieces)
 }
 
-func (p *Pieces) HaveAtIndex(i int) bool {
-	return p.pieces[i].have
-}
-
 func (p *Pieces) pieceSize(i int) int {
 	length := p.piece_length
 	if i == p.Length()-1 {
@@ -121,6 +117,20 @@ func (ours *Pieces) CreateBitField() (b []byte) {
 		b = append(b, by)
 	}
 	return b
+}
+
+func (p *Pieces) AddBitField(b []byte) {
+	ind := 0
+	for i := range b {
+		for j := 7; j >= 0; j-- {
+			have := ((b[i]>>uint(j))&1 == 1)
+			p.setAtIndex(ind, have)
+			ind++
+			if ind >= p.Length() {
+				return
+			}
+		}
+	}
 }
 
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {

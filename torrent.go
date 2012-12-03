@@ -7,14 +7,16 @@ import (
 )
 
 type Torrent struct {
-	messages chan Message
+	messages  chan Message
+	info_hash string
+	client_id string
 }
 
 func LaunchTorrent(torrent_file string, done chan int) (string, Torrent) {
-	c := make(chan Message, 1)
-	t := Torrent{c}
+	c := make(chan Message)
+	t := Torrent{c, FindInfoHash(torrent_file), string(RandomBytes(20))}
 	go t.runTorrent(torrent_file, done)
-	return FindInfoHash(torrent_file), t
+	return t.info_hash, t
 }
 
 func (t Torrent) runTorrent(torrent_file string, done chan int) {
@@ -24,7 +26,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 		fmt.Println("Error: ", err)
 		return
 	}
-	
+
 	tracker_proxy := NewTrackerProxy(torrent)
 	msg := make(chan torrentPeer)
 	get_peers := InternalGetPeersMessage{ret: msg}
@@ -66,7 +68,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 					}
 					broadcast(peers, InternalHaveMessage{msg.index})
 					broadcast(peers, InternalCancelMessage{msg.index,
-					        msg.begin,
+						msg.begin,
 						len(msg.block),
 					})
 				}
@@ -97,8 +99,8 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 					fmt.Println("Error splitting host and port",
 						msg.c.RemoteAddr())
 				}
-				iport, _ := strconv.Atoi(port)	
-				p := torrentPeer{msg.peer_id, 
+				iport, _ := strconv.Atoi(port)
+				p := torrentPeer{msg.peer_id,
 					ip,
 					iport,
 				}
@@ -128,11 +130,19 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 func (t Torrent) CanUnchoke() bool {
 	c := make(chan bool)
 	t.messages <- InternalCanUnchokeMessage{c}
-	return <- c
+	return <-c
 }
 
 func (t Torrent) WillChoke() {
 	t.messages <- InternalChokingMessage{}
+}
+
+func (t Torrent) ClientId() string {
+	return t.client_id
+}
+
+func (t Torrent) InfoHash() string {
+	return t.info_hash
 }
 
 func broadcast(channels []chan Message, m Message) {

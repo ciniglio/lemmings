@@ -1,8 +1,8 @@
 package tracker
 
 import (
-	"net"
 	"fmt"
+	"net"
 )
 
 const PORT int = 56565
@@ -28,7 +28,7 @@ func Run() {
 	done := make(chan int)
 
 	for i := range torrent_files {
-		s,t := LaunchTorrent(torrent_files[i], done)
+		s, t := LaunchTorrent(torrent_files[i], done)
 		self.torrents[s] = &t
 	}
 
@@ -67,6 +67,6 @@ func getInfoHashFromPeer(c net.Conn) (string, string) {
 
 	info_hash := string(b[28:48])
 	peer_id := string(b[48:68])
-	
+
 	return info_hash, peer_id
 }

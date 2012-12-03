@@ -21,20 +21,19 @@ type PeerConnectionInfo struct {
 }
 
 type Peer struct {
-	torrent_info              *TorrentInfo
-	torrent_peer              torrentPeer
-	connection                *net.TCPConn
+	torrent_peer torrentPeer
+	connection   *net.TCPConn
 
 	connected                 bool
 	connection_info           *PeerConnectionInfo
 	shook_hands               bool
 	outstanding_request_count int
 
-	their_pieces              *Pieces
+	their_pieces *Pieces
 
-	messageChannel            chan Message
-	clientChannel             chan Message
-	torrent                   Torrent
+	messageChannel chan Message
+	clientChannel  chan Message
+	torrent        Torrent
 }
 
 func initialConnectionInfo() *PeerConnectionInfo {
@@ -71,7 +70,6 @@ func (peer *Peer) connect() bool {
 
 func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) *Peer {
 	peer := new(Peer)
-	peer.torrent_info = t
 	peer.torrent_peer = p
 	fmt.Println("Peer in CreatePeer", p)
 
@@ -88,7 +86,7 @@ func (peer *Peer) RunPeer() {
 		fmt.Println("Connection problem")
 		return
 	}
-	if !peer.shook_hands { 
+	if !peer.shook_hands {
 		peer.initiateHandshake()
 		fmt.Println("Sent Handshake")
 	}
@@ -169,13 +167,13 @@ func (p *Peer) getIndexAndBeginForRequest() (int, int) {
 func (p *Peer) sendRequest(index, begin int) {
 	if p.outstanding_request_count < 2 {
 		m := RequestMessage{
-			index, 
+			index,
 			begin,
 			p.their_pieces.blockSize(index, begin/int(block_size)),
 		}
 		p.outstanding_request_count += 1
 		p.send(m.bytes())
-		n := InternalSendingRequestMessage{ index, begin }
+		n := InternalSendingRequestMessage{index, begin}
 		fmt.Println("Adding sent request to clientchan", len(p.clientChannel))
 		p.clientChannel <- &n
 	}
@@ -241,18 +239,7 @@ func (p *Peer) handleRequest(m RequestMessage) {
 }
 
 func (peer *Peer) handleBitField(m BitFieldMessage) {
-	b := m.bitfield
-	ind := 0
-	for _, by := range b {
-		for j := 7; j >= 0; j-- {
-			have := ((by>>uint(j))&1 == 1)
-			peer.their_pieces.setAtIndex(ind, have)
-			ind++
-			if ind >= peer.torrent_info.numpieces {
-				return
-			}
-		}
-	}
+	peer.their_pieces.AddBitField(m.bitfield)
 }
 
 func (peer *Peer) handleHave(m HaveMessage) {
@@ -346,7 +333,6 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	return msg, curpos
 }
 
-
 type handshakeMessage struct {
 	pstrlen   byte
 	pstr      []byte
@@ -379,7 +365,7 @@ func (p *Peer) parseHandshakeMessage(b *[]byte) (*handshakeMessage, int) {
 	curpos += 8 // Reserved bytes
 	for i, _ := range m[curpos : 20+curpos] {
 		message.info_hash[i] = m[curpos : 20+curpos][i]
-		if message.info_hash[i] != byte(p.torrent_info.info_hash[i]) {
+		if message.info_hash[i] != byte(p.torrent.InfoHash()[i]) {
 			return nil, 0
 		}
 	}
@@ -403,9 +389,9 @@ func (p *Peer) initiateHandshake() {
 	binary.Read(strings.NewReader("BitTorrent protocol"),
 		binary.BigEndian, &message.pstr)
 
-	binary.Read(strings.NewReader(p.torrent_info.info_hash),
+	binary.Read(strings.NewReader(p.torrent.InfoHash()),
 		binary.BigEndian, &message.info_hash)
-	binary.Read(strings.NewReader(p.torrent_info.client_id),
+	binary.Read(strings.NewReader(p.torrent.ClientId()),
 		binary.BigEndian, &message.peer_id)
 
 	p.connection.Write(message.bytes())

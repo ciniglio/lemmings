@@ -229,6 +229,6 @@ type InternalCanUnchokeMessage struct {
 
 func (c InternalCanUnchokeMessage) kind() kind { return i_can_unchoke }
 
-type InternalChokingMessage struct {}
+type InternalChokingMessage struct{}
 
 func (c InternalChokingMessage) kind() kind { return i_will_choke }
