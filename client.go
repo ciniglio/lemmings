@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"fmt"
 	"net"
 )
 
@@ -22,7 +21,7 @@ func (self Client) Run() {
 	addr := &net.TCPAddr{nil, PORT}
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		fmt.Println("Listening error:", err)
+		errorl.Println("Listening error:", err)
 	}
 
 	done := make(chan int)
@@ -36,7 +35,7 @@ func (self Client) Run() {
 		default:
 			c, err := listener.AcceptTCP()
 			if err != nil {
-				fmt.Println("Accept Error:", err)
+				errorl.Println("Accept Error:", err)
 				continue
 			}
 			ih, peer_id := getInfoHashFromPeer(c)
@@ -59,13 +58,13 @@ func (self Client) AddTorrent(name string) {
 
 func getInfoHashFromPeer(c net.Conn) (string, string) {
 	b := make([]byte, handshake_length)
-	fmt.Println("Parsing handshake")
+	debugl.Println("Parsing handshake from client")
 	i := 0
 	for i < handshake_length {
 		t := make([]byte, handshake_length)
 		n, err := c.Read(t)
 		if err != nil {
-			fmt.Println("Error recieving", err)
+			errorl.Println("Error recieving", err)
 			return "", ""
 		}
 		b = append(b, t...)

@@ -3,7 +3,6 @@ package tracker
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"runtime"
@@ -44,12 +43,12 @@ func initialConnectionInfo() *PeerConnectionInfo {
 }
 
 func (peer *Peer) connect() bool {
-	fmt.Println("Calling connect(): ", peer)
+	debugl.Println("Calling connect(): ", peer)
 	p := peer.torrent_peer
 	dest_addr := new(net.TCPAddr)
 	dest_addr.IP = net.ParseIP(p.ip)
 	if dest_addr.IP == nil {
-		fmt.Println("Couldn't get a valid IP")
+		errorl.Println("Couldn't get a valid IP")
 		return false
 	}
 	dest_addr.Port = p.port
@@ -58,10 +57,10 @@ func (peer *Peer) connect() bool {
 
 	peer.connection, err = net.DialTCP("tcp", nil, dest_addr)
 	if err != nil {
-		fmt.Println("Couldn't connect: ", err)
+		errorl.Println("Couldn't connect: ", err)
 		return false
 	} else {
-		fmt.Println("Connected to a peer: ", dest_addr.IP, dest_addr.Port)
+		debugl.Println("Connected to a peer: ", dest_addr.IP, dest_addr.Port)
 	}
 	peer.connection.SetKeepAlive(true)
 	peer.connected = true
@@ -71,7 +70,7 @@ func (peer *Peer) connect() bool {
 func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) *Peer {
 	peer := new(Peer)
 	peer.torrent_peer = p
-	fmt.Println("Peer in CreatePeer", p)
+	debugl.Println("Peer in CreatePeer", p)
 
 	peer.connection_info = initialConnectionInfo()
 	peer.their_pieces = CreateNewPieces(t.numpieces, t)
@@ -83,12 +82,12 @@ func CreatePeer(p torrentPeer, t *TorrentInfo, m chan Message, torrent Torrent) 
 
 func (peer *Peer) RunPeer() {
 	if !peer.connected && !peer.connect() {
-		fmt.Println("Connection problem")
+		errorl.Println("Connection problem")
 		return
 	}
 	if !peer.shook_hands {
 		peer.initiateHandshake()
-		fmt.Println("Sent Handshake")
+		debugl.Println("Sent Handshake")
 	}
 	peer.clientChannel <- InternalSubscribeMessage{peer.messageChannel}
 	go peer.readerRoutine()
@@ -97,42 +96,42 @@ func (peer *Peer) RunPeer() {
 		runtime.Gosched()
 		select {
 		case msg := <-peer.messageChannel:
-			fmt.Println("Recvd Message: ", peer)
+			debugl.Println("Recvd Message: ", peer)
 			switch msg.kind() {
 			case choke:
-				fmt.Println("Choked")
+				debugl.Println("Choked")
 				peer.connection_info.peer_choking = true
 			case unchoke:
-				fmt.Println("Unchoked")
+				debugl.Println("Unchoked")
 				peer.connection_info.peer_choking = false
 			case interested:
-				fmt.Println("Interested")
+				debugl.Println("Interested")
 				peer.connection_info.peer_interested = true
 			case not_interested:
-				fmt.Println("Not Interested")
+				debugl.Println("Not Interested")
 				peer.connection_info.peer_interested = false
 			case bitfield:
-				fmt.Println("BitField")
+				debugl.Println("BitField")
 				peer.handleBitField(msg.(BitFieldMessage))
 			case have:
-				fmt.Println("Have")
+				debugl.Println("Have")
 				peer.handleHave(msg.(HaveMessage))
 			case request:
-				fmt.Println("Request")
+				debugl.Println("Request")
 				// talk to client, see if we have it, send piece
 				peer.handleRequest(msg.(RequestMessage))
 			case piece_t:
-				fmt.Println("Piece")
+				debugl.Println("Piece")
 				// talk to client
 				peer.handlePiece(msg.(PieceMessage))
 			case i_cancel:
-				fmt.Println("Other peer recieved block")
+				debugl.Println("Other peer recieved block")
 				peer.sendCancel(msg.(InternalCancelMessage))
 			case i_have:
-				fmt.Println("Recieved Broadcast")
+				debugl.Println("Recieved Broadcast")
 				peer.send(HaveMessage(msg.(InternalHaveMessage)).bytes())
 			default:
-				fmt.Println("Something weird")
+				debugl.Println("Something weird")
 			}
 		default:
 			peer.act()
@@ -143,12 +142,12 @@ func (peer *Peer) RunPeer() {
 func (p *Peer) send(b []byte) {
 	n := 0
 	var err error
-	fmt.Println("trying to send:", b)
+	debugl.Println("trying to send:", b)
 	for n < len(b) {
 		b = b[n:]
 		n, err = p.connection.Write(b)
 		if err != nil {
-			fmt.Println("Send error", err)
+			errorl.Println("Send error", err)
 			return
 		}
 	}
@@ -174,7 +173,7 @@ func (p *Peer) sendRequest(index, begin int) {
 		p.outstanding_request_count += 1
 		p.send(m.bytes())
 		n := InternalSendingRequestMessage{index, begin}
-		fmt.Println("Adding sent request to clientchan", len(p.clientChannel))
+		debugl.Println("Adding sent request to clientchan", len(p.clientChannel))
 		p.clientChannel <- &n
 	}
 }
@@ -207,7 +206,7 @@ func (p *Peer) act() {
 			switch {
 			case !p.connection_info.am_interested:
 				p.connection_info.am_interested = true
-				fmt.Println("Sending Interested")
+				debugl.Println("Sending Interested")
 				p.send(InterestedMessage{}.bytes())
 				p.sendRequest(n, b)
 			case !p.connection_info.peer_choking:
@@ -225,7 +224,7 @@ func (p *Peer) act() {
 
 func (p *Peer) handlePiece(m PieceMessage) {
 	p.outstanding_request_count -= 1
-	fmt.Println("Adding piece to clientchan", len(p.clientChannel))
+	debugl.Println("Adding piece to clientchan", len(p.clientChannel))
 	p.clientChannel <- m
 }
 
@@ -254,8 +253,8 @@ func (p *Peer) readerRoutine() {
 		n, err := p.connection.Read(data)
 
 		if err != io.EOF && err != nil {
-			fmt.Printf("Read %d bytes\n", n)
-			fmt.Println("Reading from connection: ", err, time.Now())
+			errorl.Printf("Read %d bytes\n", n)
+			errorl.Println("Reading from connection: ", err, time.Now())
 			return
 		}
 
@@ -274,7 +273,7 @@ func (p *Peer) readerRoutine() {
 			if msg != nil {
 				p.messageChannel <- msg
 			}
-			fmt.Println("Adding to message queue; unread: ", len(p.messageChannel))
+			debugl.Println("Adding to message queue; unread: ", len(p.messageChannel))
 			msg, curpos = parseBytesToMessage(buffer)
 		}
 	}
@@ -301,7 +300,7 @@ func parseBytesToMessage(buffer []byte) (Message, int) {
 	case size == 4:
 		//do nothing
 	default:
-		fmt.Println("Parsing Message, ID: ", id)
+		debugl.Println("Parsing Message, ID: ", id)
 		switch id {
 		case 0:
 			msg = ChokeMessage{}
@@ -345,7 +344,7 @@ func (p *Peer) parseHandshakeMessage(b *[]byte) (*handshakeMessage, int) {
 	if p.shook_hands {
 		return nil, 0
 	}
-	fmt.Println("Parsing handshake")
+	debugl.Println("Parsing handshake")
 	m := *b
 	curpos := 0
 	message := new(handshakeMessage)
@@ -355,7 +354,7 @@ func (p *Peer) parseHandshakeMessage(b *[]byte) (*handshakeMessage, int) {
 	}
 	curpos += 1
 	message.pstr = m[curpos : int(m[0])+curpos]
-	fmt.Printf("Message length: %d\n", int(m[0]))
+	debugl.Printf("Message length: %d\n", int(m[0]))
 	for i, b := range message.pstr {
 		if b != byte("BitTorrent protocol"[i]) {
 			return nil, 0
@@ -374,8 +373,8 @@ func (p *Peer) parseHandshakeMessage(b *[]byte) (*handshakeMessage, int) {
 		message.peer_id[i] = m[curpos : 20+curpos][i]
 	}
 	curpos += 20 // peer_id
-	fmt.Printf("Message: %q\n", message.info_hash)
-	fmt.Printf("Peer: %q\n", message.peer_id)
+	debugl.Printf("Message: %q\n", message.info_hash)
+	debugl.Printf("Peer: %q\n", message.peer_id)
 
 	p.shook_hands = true
 	*b = m[curpos:]
@@ -395,7 +394,7 @@ func (p *Peer) initiateHandshake() {
 		binary.BigEndian, &message.peer_id)
 
 	p.connection.Write(message.bytes())
-	fmt.Printf("msg %x", message.bytes())
+	debugl.Printf("msg %x", message.bytes())
 
 	return
 }

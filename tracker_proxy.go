@@ -72,6 +72,7 @@ func (t *TrackerProxy) newTrackerGetRequest() *trackerGetRequest {
 	tgr.announce_url = t.announce
 	tgr.info_hash = t.torrent.InfoHash()
 	tgr.peer_id = t.torrent.ClientId()
+	tgr.port = strconv.Itoa(PORT)
 	return tgr
 }
 
@@ -84,7 +85,7 @@ func (t *TrackerProxy) getPeers() []torrentPeer {
 }
 
 func (t *TrackerProxy) sendFinished(u, d int) {
-	fmt.Println("Sending completed to tracker", u, d)
+	debugl.Println("Sending completed to tracker", u, d)
 	tgr := t.newTrackerGetRequest()
 	tgr.event = "completed"
 	tgr.uploaded = u
@@ -132,6 +133,7 @@ func (t *trackerGetRequest) generateGetString() string {
 		v.Set("uploaded", strconv.Itoa(t.uploaded))
 		v.Set("downloaded", strconv.Itoa(t.downloaded))
 	}
+	v.Set("port", t.port)
 	u.RawQuery = v.Encode()
 	return u.String()
 }
@@ -139,7 +141,7 @@ func (t *trackerGetRequest) generateGetString() string {
 func (t *trackerGetRequest) makeTrackerRequest() *trackerResponse {
 	q := t.generateGetString()
 	t.event = ""
-	fmt.Printf("Tracker Announce: %v\n\n", q)
+	debugl.Printf("Tracker Announce: %v\n\n", q)
 	res, err := http.Get(q)
 	if err != nil {
 		log.Fatal(err)
@@ -150,7 +152,7 @@ func (t *trackerGetRequest) makeTrackerRequest() *trackerResponse {
 		log.Fatal(err)
 	}
 	tr := parseTrackerResponse(string(b))
-	fmt.Printf("Tracker Response: %s\n\n", string(b))
+	debugl.Printf("Tracker Response: %s\n\n", string(b))
 	return tr
 }
 

@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 )
@@ -25,7 +24,7 @@ func (self Torrent) runTorrent(torrent_file string, done chan int) {
 	c := self.messages
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
-		fmt.Println("Error: ", err)
+		errorl.Println("Error: ", err)
 		return
 	}
 
@@ -79,10 +78,10 @@ func (self Torrent) runTorrent(torrent_file string, done chan int) {
 					}
 				}
 			case i_write_block:
-				fmt.Println("About to write")
+				debugl.Println("About to write")
 				fw.messages <- m
 			case i_subscribe:
-				fmt.Println("Subscribed a peer")
+				debugl.Println("Subscribed a peer")
 				msg := m.(InternalSubscribeMessage)
 				peers = append(peers, msg.c)
 			case i_request:
@@ -103,8 +102,9 @@ func (self Torrent) runTorrent(torrent_file string, done chan int) {
 				msg := m.(InternalAddPeerMessage)
 				ip, port, err := net.SplitHostPort(msg.c.RemoteAddr().String())
 				if err != nil {
-					fmt.Println("Error splitting host and port",
+					errorl.Println("Error splitting host and port",
 						msg.c.RemoteAddr())
+					continue
 				}
 				iport, _ := strconv.Atoi(port)
 				p := torrentPeer{msg.peer_id,
@@ -131,7 +131,7 @@ func (self Torrent) runTorrent(torrent_file string, done chan int) {
 				u := [2]int{ self.uploaded, self.downloaded }
 				msg.ret <- u
 			default:
-				fmt.Println("Got weird internal request")
+				errorl.Println("Got weird internal request")
 			}
 		}
 	}
@@ -164,7 +164,7 @@ func (t Torrent) Stats() (int, int) {
 }
 
 func broadcast(channels []chan Message, m Message) {
-	fmt.Println("Number of broadcast channels:", len(channels))
+	debugl.Println("Number of broadcast channels:", len(channels))
 	for i := range channels {
 		go func(ch chan Message) {
 			ch <- m

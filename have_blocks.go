@@ -231,13 +231,13 @@ func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) bool {
 		return false
 	}
 	if i >= p.Length() || (offset/int(block_size)) >= p.lengthBlocksInPiece(i) {
-		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
-		fmt.Printf("Compare to index: %d\n", p.Length())
+		errorl.Printf("Got a bad index: %d /offset: %d\n", i, offset)
+		errorl.Printf("Compare to index: %d\n", p.Length())
 
 		return false
 	}
 	if len(b) != 16384 && i < (p.Length()-1) {
-		fmt.Printf("Got a bad block")
+		errorl.Printf("Got a bad block")
 		return false
 	}
 	p.pieces[i].blocks[offset/int(block_size)] = true
@@ -254,10 +254,10 @@ func (p *Pieces) checkPiece(i int) bool {
 			return false
 		}
 	}
-	fmt.Println("Blocks: ", p.pieces[i].blocks)
+	debugl.Println("Blocks: ", p.pieces[i].blocks)
 
-	fmt.Println("Finished a block ", i)
-	fmt.Println(p)
+	debugl.Println("Finished a block ", i)
+	debugl.Println(p)
 
 	h := sha1.New()
 	h.Write(p.pieces[i].data[0:p.pieceSize(i)])
@@ -269,11 +269,11 @@ func (p *Pieces) checkPiece(i int) bool {
 			p.pieces[i].data = nil
 			p.pieces[i].blocks = nil
 			p.pieces[i].blocks_requested = nil
-			fmt.Println("Bad Hash")
+			errorl.Println("Bad Hash")
 			return false
 		}
 	}
-	fmt.Println("Going to add write message to client_chan", len(p.client_chan))
+	debugl.Println("Going to add write message to client_chan", len(p.client_chan))
 
 	p.setAtIndex(i, true)
 	p.num_have++
