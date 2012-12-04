@@ -28,6 +28,9 @@ func (d debugging) Println(args ...interface{}) {
 }
 
 func (d debugging) Printf(format string, args ...interface{}) {
+	if d == debugl && !debug_flag {
+		return
+	}
 	Log.Printf(format, args...)
 }
 

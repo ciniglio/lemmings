@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"fmt"
 	"os"
 	"path"
 )
@@ -37,7 +36,7 @@ func (fw *FileWriter) Run() {
 	if !path.IsAbs(root) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Println("Error getting wd 0: ", err)
+			errorl.Println("Error getting wd 0: ", err)
 		}
 		root = path.Join(cwd, root)
 	}
@@ -45,7 +44,7 @@ func (fw *FileWriter) Run() {
 		root = path.Join(root, fw.torrent.name)
 		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
-			fmt.Println("Error Mkdir multifile", err)
+			errorl.Println("Error Mkdir multifile", err)
 			// handle this too
 		}
 
@@ -53,11 +52,11 @@ func (fw *FileWriter) Run() {
 		root = path.Join(root, path.Dir(fw.torrent.name))
 		err = os.MkdirAll(root, os.ModeDir|perm)
 		if err != nil {
-			fmt.Println("Error Mkdir 1 file", err)
+			errorl.Println("Error Mkdir 1 file", err)
 		}
 	}
 	if err != nil {
-		fmt.Println("Error Chdir root", err)
+		errorl.Println("Error Chdir root", err)
 		// handle this somehow
 	}
 	for _, f := range fw.torrent.files {
@@ -69,7 +68,7 @@ func (fw *FileWriter) Run() {
 			dir = path.Join(dir, d)
 			err = os.MkdirAll(dir, os.ModeDir|perm)
 			if err != nil {
-				fmt.Println("Error Create Dir", err)
+				errorl.Println("Error Create Dir", err)
 				// handle
 			}
 		}
@@ -77,15 +76,15 @@ func (fw *FileWriter) Run() {
 		file_name := f.path[len(f.path)-1]
 		fi, err := os.Create(path.Join(dir, file_name))
 		if err != nil {
-			fmt.Println("Error Create file", err, f)
+			errorl.Println("Error Create file", err, f)
 		}
-		fmt.Println("DIR:::", dir)
+		debugl.Println("DIR:::", dir)
 		fp := filePath{dir, file_name}
 		files = append(files, fp)
 
 		fi.Close()
 		if err != nil {
-			fmt.Println("Error Chdir root", err)
+			errorl.Println("Error Chdir root", err)
 		}
 	}
 
@@ -124,7 +123,7 @@ func (fw *FileWriter) write(b []byte, index int) {
 			}
 			fi, err := os.OpenFile(path.Join(fw.files[i].dir, fw.files[i].f), os.O_RDWR, perm)
 			if err != nil {
-				fmt.Println("Error opening: ", err, fw.files[i])
+				errorl.Println("Error opening: ", err, fw.files[i])
 			}
 			fi.WriteAt(b[next_byte:to_write], file_offset)
 			fi.Close()
