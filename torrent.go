@@ -21,15 +21,15 @@ func LaunchTorrent(torrent_file string, done chan int) (string, Torrent) {
 	return t.info_hash, t
 }
 
-func (t Torrent) runTorrent(torrent_file string, done chan int) {
-	c := t.messages
+func (self Torrent) runTorrent(torrent_file string, done chan int) {
+	c := self.messages
 	torrent, err := ReadTorrentFile(torrent_file, c)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
 	}
 
-	tracker_proxy := NewTrackerProxy(torrent)
+	tracker_proxy := NewTrackerProxy(torrent, self)
 	msg := make(chan torrentPeer)
 	get_peers := InternalGetPeersMessage{ret: msg}
 	tracker_proxy.msg <- get_peers
@@ -38,7 +38,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 	go fw.Run()
 
 	for p := range msg {
-		peer := CreatePeer(p, torrent, c, t)
+		peer := CreatePeer(p, torrent, c, self)
 		if peer != nil {
 			go peer.RunPeer()
 		}
@@ -73,9 +73,9 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 						msg.begin,
 						len(msg.block),
 					})
-					t.downloaded += len(msg.block)
+					self.downloaded += len(msg.block)
 					if torrent.our_pieces.Done() {
-						tracker_proxy.Done(t.uploaded, t.downloaded)
+						tracker_proxy.Done(self.uploaded, self.downloaded)
 					}
 				}
 			case i_write_block:
@@ -94,7 +94,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 					ret.index = req.index
 					ret.begin = req.begin
 					ret.block = b
-					t.uploaded += req.length
+					self.uploaded += req.length
 					msg.ret <- ret
 				} else {
 					msg.ret <- nil
@@ -111,7 +111,7 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 					ip,
 					iport,
 				}
-				peer := CreatePeer(p, torrent, c, t)
+				peer := CreatePeer(p, torrent, c, self)
 				peer.connection = msg.c
 				peer.shook_hands = true
 				peer.connected = true
@@ -126,6 +126,10 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 				}
 			case i_will_choke:
 				num_unchoked--
+			case i_upload_download:
+				msg := m.(InternalGetUploadDownloadMessage)
+				u := [2]int{ self.uploaded, self.downloaded }
+				msg.ret <- u
 			default:
 				fmt.Println("Got weird internal request")
 			}
@@ -150,6 +154,13 @@ func (t Torrent) ClientId() string {
 
 func (t Torrent) InfoHash() string {
 	return t.info_hash
+}
+
+func (t Torrent) Stats() (int, int) {
+	c := make(chan [2]int)
+	t.messages <- InternalGetUploadDownloadMessage{c}
+	i := <- c
+	return i[0], i[1]
 }
 
 func broadcast(channels []chan Message, m Message) {

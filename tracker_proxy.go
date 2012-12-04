@@ -30,21 +30,17 @@ type trackerResponse struct {
 }
 
 type TrackerProxy struct {
-	tgr      *trackerGetRequest
-	response *trackerResponse
-	event    string
-	msg      chan Message
-	timeout  <- chan time.Time
+	torrent   Torrent
+	announce  string
+	event     string
+	msg       chan Message
+	timeout   <- chan time.Time
 }
 
-func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
+func NewTrackerProxy(ti *TorrentInfo, t Torrent) *TrackerProxy {
 	tp := new(TrackerProxy)
-	tgr := new(trackerGetRequest)
-	tgr.info_hash = t.info_hash
-	tgr.peer_id = t.client_id
-	tgr.announce_url = t.announce
-	tgr.event = "started"
-	tp.tgr = tgr
+	tp.torrent = t
+	tp.announce = ti.announce
 	tp.msg = make(chan Message)
 	go tp.handleMessages()
 	return tp
@@ -66,25 +62,42 @@ func (t *TrackerProxy) handleMessages() {
 				t.sendFinished(msg.upload, msg.download)
 			}
 		case <- t.timeout:
-			for _ = range t.getPeers() {
-			}
+			t.sendAnnounce()
 		}
 	}
 }
 
+func (t *TrackerProxy) newTrackerGetRequest() *trackerGetRequest {
+	tgr := new(trackerGetRequest)
+	tgr.announce_url = t.announce
+	tgr.info_hash = t.torrent.InfoHash()
+	tgr.peer_id = t.torrent.ClientId()
+	return tgr
+}
+
 func (t *TrackerProxy) getPeers() []torrentPeer {
-	t.response = t.tgr.makeTrackerRequest()
-	t.timeout = time.After(time.Duration(t.response.interval) * time.Second)
-	return t.response.peers
+	tgr := t.newTrackerGetRequest()
+	tgr.event = "started"
+	response := tgr.makeTrackerRequest()
+	t.timeout = time.After(time.Duration(response.interval) * time.Second)
+	return response.peers
 }
 
 func (t *TrackerProxy) sendFinished(u, d int) {
 	fmt.Println("Sending completed to tracker", u, d)
-	t.tgr.event = "completed"
-	t.tgr.uploaded = u
-	t.tgr.downloaded = d
-	t.response = t.tgr.makeTrackerRequest()
-	t.timeout = time.After(time.Duration(t.response.interval) * time.Second)
+	tgr := t.newTrackerGetRequest()
+	tgr.event = "completed"
+	tgr.uploaded = u
+	tgr.downloaded = d
+	response := tgr.makeTrackerRequest()
+	t.timeout = time.After(time.Duration(response.interval) * time.Second)
+}
+
+func (t *TrackerProxy) sendAnnounce() {
+	tgr := t.newTrackerGetRequest()
+	tgr.uploaded, tgr.downloaded = t.torrent.Stats()
+	response := tgr.makeTrackerRequest()
+	t.timeout = time.After(time.Duration(response.interval) * time.Second)
 }
 
 func (t *TrackerProxy) Done(u, d int) {
