@@ -23,6 +23,9 @@ func (self Client) Run() {
 	if err != nil {
 		errorl.Println("Listening error:", err)
 	}
+	new_peers := make(chan *net.TCPConn)
+
+	go listenOnPort(listener, new_peers)
 
 	done := make(chan int)
 	for {
@@ -32,12 +35,7 @@ func (self Client) Run() {
 
 			s, t := LaunchTorrent(msg.filename, done)
 			self.torrents[s] = &t
-		default:
-			c, err := listener.AcceptTCP()
-			if err != nil {
-				errorl.Println("Accept Error:", err)
-				continue
-			}
+		case c := <- new_peers:
 			ih, peer_id := getInfoHashFromPeer(c)
 			if ih == "" {
 				continue
@@ -48,6 +46,17 @@ func (self Client) Run() {
 			}
 			t.messages <- InternalAddPeerMessage{c, peer_id}
 		}
+	}
+}
+
+func listenOnPort(listener *net.TCPListener, c chan *net.TCPConn) {
+	for {
+		conn, err := listener.AcceptTCP()
+		if err != nil {
+			errorl.Println("Accept Error:", err)
+			continue
+		}
+		c <- conn
 	}
 }
 
