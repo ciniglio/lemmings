@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-
 type torrentPeer struct {
 	peer_id string //optional initially
 	ip      string
@@ -30,11 +29,11 @@ type trackerResponse struct {
 }
 
 type TrackerProxy struct {
-	torrent   Torrent
-	announce  string
-	event     string
-	msg       chan Message
-	timeout   <- chan time.Time
+	torrent  Torrent
+	announce string
+	event    string
+	msg      chan Message
+	timeout  <-chan time.Time
 }
 
 func NewTrackerProxy(ti *TorrentInfo, t Torrent) *TrackerProxy {
@@ -49,7 +48,7 @@ func NewTrackerProxy(ti *TorrentInfo, t Torrent) *TrackerProxy {
 func (t *TrackerProxy) handleMessages() {
 	for {
 		select {
-		case m := <- t.msg:
+		case m := <-t.msg:
 			switch m.kind() {
 			case i_get_peers:
 				msg := m.(InternalGetPeersMessage)
@@ -61,7 +60,7 @@ func (t *TrackerProxy) handleMessages() {
 				msg := m.(InternalFinishedTorrentMessage)
 				t.sendFinished(msg.upload, msg.download)
 			}
-		case <- t.timeout:
+		case <-t.timeout:
 			t.sendAnnounce()
 		}
 	}
@@ -155,7 +154,6 @@ func (t *trackerGetRequest) makeTrackerRequest() *trackerResponse {
 	debugl.Printf("Tracker Response: %s\n\n", string(b))
 	return tr
 }
-
 
 func parsePeersDictionary(m []bItem) []torrentPeer {
 	out := []torrentPeer{}

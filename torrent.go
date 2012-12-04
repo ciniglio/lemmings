@@ -128,7 +128,7 @@ func (self Torrent) runTorrent(torrent_file string, done chan int) {
 				num_unchoked--
 			case i_upload_download:
 				msg := m.(InternalGetUploadDownloadMessage)
-				u := [2]int{ self.uploaded, self.downloaded }
+				u := [2]int{self.uploaded, self.downloaded}
 				msg.ret <- u
 			default:
 				errorl.Println("Got weird internal request")
@@ -159,7 +159,7 @@ func (t Torrent) InfoHash() string {
 func (t Torrent) Stats() (int, int) {
 	c := make(chan [2]int)
 	t.messages <- InternalGetUploadDownloadMessage{c}
-	i := <- c
+	i := <-c
 	return i[0], i[1]
 }
 

@@ -13,7 +13,7 @@ type Client struct {
 }
 
 func NewClient() Client {
-	c:= Client{make(map[string](*Torrent)), make(chan Message)}
+	c := Client{make(map[string](*Torrent)), make(chan Message)}
 	return c
 }
 
@@ -27,7 +27,7 @@ func (self Client) Run() {
 	done := make(chan int)
 	for {
 		select {
-		case m := <- self.messages:
+		case m := <-self.messages:
 			msg := m.(InternalAddTorrentMessage)
 
 			s, t := LaunchTorrent(msg.filename, done)
@@ -54,7 +54,6 @@ func (self Client) Run() {
 func (self Client) AddTorrent(name string) {
 	self.messages <- InternalAddTorrentMessage{name}
 }
-
 
 func getInfoHashFromPeer(c net.Conn) (string, string) {
 	b := make([]byte, handshake_length)

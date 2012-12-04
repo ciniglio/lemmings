@@ -10,12 +10,13 @@ import (
 	"time"
 )
 
-var Log *log.Logger = log.New(os.Stderr,"",log.LstdFlags)
+var Log *log.Logger = log.New(os.Stderr, "", log.LstdFlags)
 
 type debugging int
+
 const (
 	debugl debugging = iota
-        errorl
+	errorl
 )
 
 const debug_flag = false
@@ -33,7 +34,6 @@ func (d debugging) Printf(format string, args ...interface{}) {
 	}
 	Log.Printf(format, args...)
 }
-
 
 func RandomBytes(n int) []byte {
 	out := make([]byte, n)

@@ -97,11 +97,10 @@ func (p *Pieces) requested(index, begin int) bool {
 	return p.pieces[index].requested && p.pieces[index].blocks_requested[begin]
 }
 
-
 func (ours *Pieces) GetBlockAtPieceAndOffset(i, o, l int) []byte {
 	size := ours.blockSize(i, o)
 
-	if i > ours.Length() || !ours.pieces[i].have || l > (size - o) {
+	if i > ours.Length() || !ours.pieces[i].have || l > (size-o) {
 		return nil
 	}
 
@@ -149,16 +148,16 @@ func (p *Pieces) AddBitField(b []byte) {
 func (p piece) needBlock(o, rem int) bool {
 	max_age := 2 * time.Minute
 	have := p.blocks[o]
-	req  := p.blocks_requested[o]
+	req := p.blocks_requested[o]
 	stale := time.Since(p.b_requested_at[o]) > max_age
-	if rem >5 {
+	if rem > 5 {
 		return !have && (!req || stale)
 	}
 	return !have
 }
 
 func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
-	remaining := ours.Length() - ours.num_have 
+	remaining := ours.Length() - ours.num_have
 	indices := make([]int, 0)
 	for i, p := range ours.pieces {
 		// for an incomplete piece that is in progress, get
