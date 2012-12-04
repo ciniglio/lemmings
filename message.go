@@ -31,6 +31,7 @@ const (
 	i_can_unchoke
 	i_will_choke
 	i_add_torrent
+	i_finished_torrent
 )
 
 type Message interface {
@@ -239,3 +240,10 @@ type InternalAddTorrentMessage struct {
 }
 
 func (c InternalAddTorrentMessage) kind() kind { return i_add_torrent }
+
+type InternalFinishedTorrentMessage struct {
+	upload   int
+	download int
+}
+
+func (c InternalFinishedTorrentMessage) kind() kind { return i_finished_torrent }

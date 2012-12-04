@@ -207,6 +207,15 @@ func (ours *Pieces) GetPieceAndOffsetForRequest(theirs *Pieces) (int, int) {
 	return ind, (off * int(block_size))
 }
 
+func (ours *Pieces) Done() bool {
+	for _, p := range ours.pieces {
+		if !p.have {
+			return false
+		}
+	}
+	return true
+}
+
 func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
 	if i >= p.Length() || offset >= p.lengthBlocksInPiece(i) {
 		return false
@@ -217,6 +226,9 @@ func (p *Pieces) HaveBlockAtPieceAndOffset(i, offset int) bool {
 func (p *Pieces) SetBlockAtPieceAndOffset(i int, offset int, b []byte) bool {
 	if p.pieces[i].blocks == nil {
 		p.initBlocksAtPiece(i)
+	}
+	if p.pieces[i].have {
+		return false
 	}
 	if i >= p.Length() || (offset/int(block_size)) >= p.lengthBlocksInPiece(i) {
 		fmt.Printf("Got a bad index: %d /offset: %d\n", i, offset)
@@ -264,6 +276,7 @@ func (p *Pieces) checkPiece(i int) bool {
 	fmt.Println("Going to add write message to client_chan", len(p.client_chan))
 
 	p.setAtIndex(i, true)
+	p.num_have++
 	p.pieces[i].requested = false
 	return true
 }

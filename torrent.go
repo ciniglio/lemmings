@@ -74,6 +74,9 @@ func (t Torrent) runTorrent(torrent_file string, done chan int) {
 						len(msg.block),
 					})
 					t.downloaded += len(msg.block)
+					if torrent.our_pieces.Done() {
+						tracker_proxy.Done(t.uploaded, t.downloaded)
+					}
 				}
 			case i_write_block:
 				fmt.Println("About to write")

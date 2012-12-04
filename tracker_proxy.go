@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func NewTrackerProxy(t *TorrentInfo) *TrackerProxy {
 	tgr.info_hash = t.info_hash
 	tgr.peer_id = t.client_id
 	tgr.announce_url = t.announce
-	tp.event = "started"
+	tgr.event = "started"
 	tp.tgr = tgr
 	tp.msg = make(chan Message)
 	go tp.handleMessages()
@@ -56,22 +57,39 @@ func (t *TrackerProxy) handleMessages() {
 			switch m.kind() {
 			case i_get_peers:
 				msg := m.(InternalGetPeersMessage)
-				for _, p := range t.GetPeers() {
+				for _, p := range t.getPeers() {
 					msg.ret <- p
 				}
 				close(msg.ret)
+			case i_finished_torrent:
+				msg := m.(InternalFinishedTorrentMessage)
+				t.sendFinished(msg.upload, msg.download)
 			}
 		case <- t.timeout:
-			for _ = range t.GetPeers() {
+			for _ = range t.getPeers() {
 			}
 		}
 	}
 }
 
-func (t *TrackerProxy) GetPeers() []torrentPeer {
+func (t *TrackerProxy) getPeers() []torrentPeer {
 	t.response = t.tgr.makeTrackerRequest()
 	t.timeout = time.After(time.Duration(t.response.interval) * time.Second)
 	return t.response.peers
+}
+
+func (t *TrackerProxy) sendFinished(u, d int) {
+	fmt.Println("Sending completed to tracker", u, d)
+	t.tgr.event = "completed"
+	t.tgr.uploaded = u
+	t.tgr.downloaded = d
+	t.response = t.tgr.makeTrackerRequest()
+	t.timeout = time.After(time.Duration(t.response.interval) * time.Second)
+}
+
+func (t *TrackerProxy) Done(u, d int) {
+	m := InternalFinishedTorrentMessage{u, d}
+	t.msg <- m
 }
 
 type trackerGetRequest struct {
@@ -97,6 +115,10 @@ func (t *trackerGetRequest) generateGetString() string {
 	v.Set("info_hash", t.info_hash)
 	v.Set("peer_id", t.peer_id)
 	v.Set("event", t.event)
+	if t.uploaded != 0 || t.downloaded != 0 {
+		v.Set("uploaded", strconv.Itoa(t.uploaded))
+		v.Set("downloaded", strconv.Itoa(t.downloaded))
+	}
 	u.RawQuery = v.Encode()
 	return u.String()
 }
